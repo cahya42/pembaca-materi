@@ -2,19 +2,17 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pembaca Materi Digital</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #18191a;
-      color: #f1f2f6;
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      touch-action: pan-y;
     }
     header {
       background: #242526;
@@ -23,118 +21,38 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid #3a3b3c;
-      z-index: 10;
+      gap: 10px;
     }
-    .brand-title {
-      font-size: 13px;
-      font-weight: 600;
+    label {
+      font-size: 14px;
       color: #b0b3b8;
+      font-weight: 600;
+      white-space: nowrap;
     }
     select {
       background: #3a3b3c;
       color: #ffffff;
       border: 1px solid #4e4f50;
-      padding: 6px 10px;
+      padding: 8px 12px;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 14px;
       outline: none;
-      max-width: 65%;
-      text-overflow: ellipsis;
+      width: 100%;
+      max-width: 320px;
     }
-    #viewer-container {
+    #viewer-frame {
       flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      background: #18191a;
-      overflow: hidden;
-      padding: 8px;
-      user-select: none;
-    }
-    canvas {
-      max-width: 100%;
-      max-height: 100%;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-      border-radius: 6px;
-      background: #ffffff;
-      transition: transform 0.15s ease-out;
-    }
-    .page-turn-next {
-      animation: flipNextAnim 0.25s ease-out;
-    }
-    .page-turn-prev {
-      animation: flipPrevAnim 0.25s ease-out;
-    }
-    @keyframes flipNextAnim {
-      0% { transform: scale(1) translateX(0); opacity: 1; }
-      50% { transform: scale(0.96) translateX(-30px); opacity: 0.7; }
-      100% { transform: scale(1) translateX(0); opacity: 1; }
-    }
-    @keyframes flipPrevAnim {
-      0% { transform: scale(1) translateX(0); opacity: 1; }
-      50% { transform: scale(0.96) translateX(30px); opacity: 0.7; }
-      100% { transform: scale(1) translateX(0); opacity: 1; }
-    }
-    #loading-indicator {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.8);
-      padding: 14px 20px;
-      border-radius: 10px;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      z-index: 20;
-    }
-    .spinner {
-      width: 24px;
-      height: 24px;
-      border: 3px solid rgba(255,255,255,0.2);
-      border-top-color: #2e89ff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    footer {
-      background: #242526;
-      padding: 10px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px solid #3a3b3c;
-      z-index: 10;
-    }
-    button.nav-btn {
-      background: #2e89ff;
-      color: white;
+      width: 100%;
+      height: 100%;
       border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    button.nav-btn:disabled {
-      background: #3a3b3c;
-      color: #777;
-      cursor: not-allowed;
-    }
-    #page-info {
-      font-size: 13px;
-      color: #b0b3b8;
+      background: #2b2b2b;
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
   <header>
-    <span class="brand-title">Materi:</span>
+    <label for="book-select">Pilih Materi:</label>
     <select id="book-select">
       <option value="wawasan-kebangsaan-dakwah-islam.pdf">1. Wawasan Kebangsaan</option>
       <option value="retorika.pdf">2. Retorika</option>
@@ -142,167 +60,15 @@
     </select>
   </header>
 
-  <div id="viewer-container">
-    <div id="loading-indicator">
-      <div class="spinner"></div>
-      <span id="loading-text">Memuat...</span>
-    </div>
-    <canvas id="pdf-render"></canvas>
-  </div>
-
-  <footer>
-    <button id="btn-prev" class="nav-btn" disabled>‹ Sebelumnya</button>
-    <span id="page-info">Halaman - / -</span>
-    <button id="btn-next" class="nav-btn" disabled>Selanjutnya ›</button>
-  </footer>
+  <iframe id="viewer-frame" src="wawasan-kebangsaan-dakwah-islam.pdf"></iframe>
 
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const select = document.getElementById('book-select');
+    const frame = document.getElementById('viewer-frame');
 
-    let pdfDoc = null;
-    let pageNum = 1;
-    let pageRendering = false;
-    let pageNumPending = null;
-
-    const canvas = document.getElementById('pdf-render');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('viewer-container');
-    const loadingElem = document.getElementById('loading-indicator');
-    const loadingText = document.getElementById('loading-text');
-    const pageInfo = document.getElementById('page-info');
-    const btnPrev = document.getElementById('btn-prev');
-    const btnNext = document.getElementById('btn-next');
-
-    function renderPage(num, animClass = '') {
-      pageRendering = true;
-      loadingElem.style.display = 'flex';
-      loadingText.textContent = `Halaman ${num}...`;
-
-      pdfDoc.getPage(num).then(page => {
-        const availableWidth = container.clientWidth - 16;
-        const availableHeight = container.clientHeight - 16;
-        const unscaledViewport = page.getViewport({ scale: 1 });
-
-        // Hitung skala pas layar HP
-        const scaleX = availableWidth / unscaledViewport.width;
-        const scaleY = availableHeight / unscaledViewport.height;
-        const scale = Math.min(scaleX, scaleY);
-
-        // Skala render tajam untuk layar retina ponsel
-        const pixelRatio = window.devicePixelRatio || 1.5;
-        const viewport = page.getViewport({ scale: scale * Math.min(pixelRatio, 2) });
-
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        canvas.style.width = `${viewport.width / Math.min(pixelRatio, 2)}px`;
-        canvas.style.height = `${viewport.height / Math.min(pixelRatio, 2)}px`;
-
-        const renderContext = {
-          canvasContext: ctx,
-          viewport: viewport
-        };
-
-        const renderTask = page.render(renderContext);
-        renderTask.promise.then(() => {
-          pageRendering = false;
-          loadingElem.style.display = 'none';
-
-          if (animClass) {
-            canvas.classList.remove('page-turn-next', 'page-turn-prev');
-            void canvas.offsetWidth; // trigger reflow
-            canvas.classList.add(animClass);
-          }
-
-          pageInfo.textContent = `${num} / ${pdfDoc.numPages}`;
-          btnPrev.disabled = num <= 1;
-          btnNext.disabled = num >= pdfDoc.numPages;
-
-          if (pageNumPending !== null) {
-            renderPage(pageNumPending);
-            pageNumPending = null;
-          }
-        });
-      }).catch(err => {
-        pageRendering = false;
-        loadingElem.style.display = 'none';
-        console.error(err);
-      });
-    }
-
-    function queueRenderPage(num, animClass = '') {
-      if (pageRendering) {
-        pageNumPending = num;
-      } else {
-        renderPage(num, animClass);
-      }
-    }
-
-    function onPrevPage() {
-      if (pageNum <= 1) return;
-      pageNum--;
-      queueRenderPage(pageNum, 'page-turn-prev');
-    }
-
-    function onNextPage() {
-      if (pageNum >= pdfDoc.numPages) return;
-      pageNum++;
-      queueRenderPage(pageNum, 'page-turn-next');
-    }
-
-    btnPrev.addEventListener('click', onPrevPage);
-    btnNext.addEventListener('click', onNextPage);
-
-    // Dukungan Usap Layar (Swipe) di Layar HP
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    container.addEventListener('touchstart', e => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    container.addEventListener('touchend', e => {
-      touchEndX = e.changedTouches[0].screenX;
-      handleSwipe();
-    }, { passive: true });
-
-    function handleSwipe() {
-      const diff = touchStartX - touchEndX;
-      if (Math.abs(diff) > 40) {
-        if (diff > 0) onNextPage(); // Geser ke kiri: halaman berikutnya
-        else onPrevPage();          // Geser ke kanan: halaman sebelumnya
-      }
-    }
-
-    // Navigasi tombol panah keyboard di laptop
-    window.addEventListener('keydown', e => {
-      if (e.key === 'ArrowRight') onNextPage();
-      if (e.key === 'ArrowLeft') onPrevPage();
+    select.addEventListener('change', (e) => {
+      frame.src = e.target.value;
     });
-
-    function loadDoc(fileName) {
-      loadingElem.style.display = 'flex';
-      loadingText.textContent = 'Membuka dokumen...';
-
-      pdfjsLib.getDocument(fileName).promise.then(pdf => {
-        pdfDoc = pdf;
-        pageNum = 1;
-        renderPage(pageNum);
-      }).catch(err => {
-        loadingText.textContent = 'Gagal memuat: ' + err.message;
-      });
-    }
-
-    document.getElementById('book-select').addEventListener('change', e => {
-      loadDoc(e.target.value);
-    });
-
-    // Sesuaikan ulang saat rotasi layar ponsel
-    window.addEventListener('resize', () => {
-      if (pdfDoc) queueRenderPage(pageNum);
-    });
-
-    // Buka file pertama
-    loadDoc(document.getElementById('book-select').value);
   </script>
 </body>
 </html>
