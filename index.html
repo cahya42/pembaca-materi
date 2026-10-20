@@ -549,7 +549,8 @@
         const scaleH = availableH / unscaledViewport.height;
         const fitScale = Math.min(scaleW, scaleH);
 
-        const dpr = Math.min(window.devicePixelRatio || 1.5, 2.0);
+        // Gunakan DPR asli layar (minimal 2.5 atau 3.0) agar teks tajam seperti membaca cetakan asli
+        const dpr = Math.max(window.devicePixelRatio || 2.0, 2.5);
         const viewport = page.getViewport({ scale: fitScale * dpr });
         const displayViewport = page.getViewport({ scale: fitScale });
 
@@ -562,7 +563,13 @@
         pageWrapper.style.height = `${displayViewport.height}px`;
         pageWrapper.style.setProperty('--scale-factor', `${fitScale}`);
 
-        const renderContext = { canvasContext: ctx, viewport: viewport };
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        const renderContext = { 
+          canvasContext: ctx, 
+          viewport: viewport 
+        };
         page.render(renderContext).promise.then(() => {
           pageRendering = false;
           loading.style.display = 'none';
