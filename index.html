@@ -774,7 +774,7 @@
             const { data: urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(item.name);
             const opt = document.createElement('option');
             opt.value = urlData.publicUrl;
-            opt.textContent = item.name.replace(/^\d+_/, '').replace('.pdf', '');
+            opt.textContent = item.name.replace(/^\d+_/, '').replace('.pdf', '').replace(/_/g, ' ');
             select.appendChild(opt);
           }
         });
@@ -815,7 +815,7 @@
       const select = document.getElementById('book-select');
       const newOption = document.createElement('option');
       newOption.value = publicUrl;
-      newOption.textContent = file.name.replace('.pdf', '');
+      newOption.textContent = file.name.replace('.pdf', '').replace(/_/g, ' ');
       select.appendChild(newOption);
       select.value = publicUrl;
 
