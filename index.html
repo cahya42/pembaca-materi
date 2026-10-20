@@ -25,7 +25,6 @@
       overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: manipulation;
     }
 
     header {
@@ -202,23 +201,18 @@
       z-index: 60;
     }
 
-    /* Modal Styling */
+    /* Modal Overlay Langsung Tanpa Konflik Sentuh */
     .modal-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(6px);
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(4px);
       z-index: 9999;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
-      touch-action: auto !important;
     }
-    .modal-overlay.active { display: flex; }
 
     .modal-box {
       background: #1e1e24;
@@ -230,12 +224,11 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 12px 35px rgba(0,0,0,0.85);
-      pointer-events: auto !important;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.9);
     }
 
     .modal-header {
-      padding: 14px 18px;
+      padding: 12px 16px;
       background: #25262c;
       display: flex;
       justify-content: space-between;
@@ -249,7 +242,7 @@
       background: none;
       border: none;
       color: #aaa;
-      font-size: 24px;
+      font-size: 26px;
       cursor: pointer;
       padding: 4px 10px;
       line-height: 1;
@@ -267,14 +260,13 @@
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      margin-bottom: 14px;
-      padding-bottom: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .guide-icon {
       font-size: 20px;
       line-height: 1;
-      padding-top: 2px;
     }
     .guide-text strong {
       color: #fff;
@@ -293,7 +285,6 @@
       font-size: 15px;
       cursor: pointer;
       margin-top: 6px;
-      touch-action: manipulation;
     }
     .btn-start-reading:active { background: #0056b3; }
 
@@ -314,12 +305,29 @@
     .toc-item:active { background: #2a2b36; }
   </style>
 
+  <!-- Script Penutup Modal Diletakkan di Awal (Pasti Berjalan Instan) -->
+  <script>
+    function closeGuideModal() {
+      const modal = document.getElementById('guide-modal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+    function openGuideModal() {
+      const modal = document.getElementById('guide-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+      const header = document.getElementById('main-header');
+      if (header) header.classList.remove('show');
+    }
+  </script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- Menu Navigasi Atas -->
   <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
@@ -331,7 +339,7 @@
       <label for="file-input" class="btn-action">📁 File</label>
       <input type="file" id="file-input" accept="application/pdf">
     </div>
-    <button id="btn-open-guide" class="btn-help" title="Petunjuk Penggunaan">❓</button>
+    <button id="btn-open-guide" class="btn-help" title="Petunjuk Penggunaan" onclick="openGuideModal()">❓</button>
   </header>
 
   <div id="floating-menu-trigger" title="Buka Menu">☰</div>
@@ -345,12 +353,12 @@
     <div id="floating-page-info">- / -</div>
   </div>
 
-  <!-- MODAL 1: PANDUAN PENGGUNAAN -->
-  <div id="guide-modal" class="modal-overlay active">
+  <!-- MODAL PANDUAN PENGGUNAAN -->
+  <div id="guide-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
         <span>📖 Panduan ModulKu</span>
-        <button id="btn-close-guide-x" class="modal-close" onclick="closeGuideModal()" ontouchstart="closeGuideModal()">✕</button>
+        <button class="modal-close" onclick="closeGuideModal()">✕</button>
       </div>
       <div class="guide-content">
         <div class="guide-item">
@@ -401,17 +409,17 @@
           </div>
         </div>
 
-        <button id="btn-start-reading" class="btn-start-reading" onclick="closeGuideModal()" ontouchstart="closeGuideModal()">Mulai Membaca</button>
+        <button class="btn-start-reading" onclick="closeGuideModal()">Mulai Membaca</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL 2: POPUP DAFTAR ISI -->
-  <div id="toc-modal" class="modal-overlay">
+  <!-- MODAL POPUP DAFTAR ISI -->
+  <div id="toc-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) this.style.display = 'none'">
     <div class="modal-box">
       <div class="modal-header">
         <span>Daftar Bab & Isi</span>
-        <button id="btn-toc-close" class="modal-close" onclick="document.getElementById('toc-modal').classList.remove('active')" ontouchstart="document.getElementById('toc-modal').classList.remove('active')">✕</button>
+        <button class="modal-close" onclick="document.getElementById('toc-modal').style.display = 'none'">✕</button>
       </div>
       <ul id="toc-list" class="toc-list">
         <li class="toc-item">Memuat daftar isi...</li>
@@ -420,12 +428,6 @@
   </div>
 
   <script>
-    function closeGuideModal() {
-      const modal = document.getElementById('guide-modal');
-      if (modal) modal.classList.remove('active');
-    }
-
-    // Inisialisasi Supabase
     const SUPABASE_URL = 'https://jgnhixgbxojcqpfxgjfk.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_mCM-3KYuxUNGkipPg-yV1A_gylLQy23';
     const BUCKET_NAME = 'materi-pdf';
@@ -446,7 +448,6 @@
     let pageRendering = false;
     let pageNumPending = null;
 
-    // --- VARIABEL PINCH ZOOM & PAN YANG STABIL ---
     let scale = 1;
     let panX = 0;
     let panY = 0;
@@ -467,8 +468,6 @@
     const pageFloatingText = document.getElementById('floating-page-info');
     const mainHeader = document.getElementById('main-header');
     const floatingMenuBtn = document.getElementById('floating-menu-trigger');
-    
-    const btnOpenGuide = document.getElementById('btn-open-guide');
     const tocModal = document.getElementById('toc-modal');
     const tocList = document.getElementById('toc-list');
     const btnToc = document.getElementById('btn-toc');
@@ -484,11 +483,6 @@
     floatingMenuBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleMenu();
-    });
-
-    btnOpenGuide.addEventListener('click', () => {
-      document.getElementById('guide-modal').classList.add('active');
-      mainHeader.classList.remove('show');
     });
 
     function updateTransform() {
@@ -542,7 +536,7 @@
       resetZoom();
       pageNum = num;
       queueRenderPage(pageNum, 'swipe-next');
-      tocModal.classList.remove('active');
+      tocModal.style.display = 'none';
     }
 
     function renderPage(num, animClass = '') {
@@ -558,10 +552,297 @@
         const scaleH = availableH / unscaledViewport.height;
         const fitScale = Math.min(scaleW, scaleH);
 
-        // Skala ketajaman optimal (2.2) agar teks tajam tanpa lag
         const dpr = Math.min(window.devicePixelRatio || 1.5, 2.2);
         const viewport = page.getViewport({ scale: fitScale * dpr });
         const displayViewport = page.getViewport({ scale: fitScale });
 
         canvas.height = viewport.height;
-        canvas.width
+        canvas.width = viewport.width;
+        canvas.style.width = `${displayViewport.width}px`;
+        canvas.style.height = `${displayViewport.height}px`;
+
+        pageWrapper.style.width = `${displayViewport.width}px`;
+        pageWrapper.style.height = `${displayViewport.height}px`;
+        pageWrapper.style.setProperty('--scale-factor', `${fitScale}`);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        const renderContext = { canvasContext: ctx, viewport: viewport };
+        page.render(renderContext).promise.then(() => {
+          pageRendering = false;
+          loading.style.display = 'none';
+
+          if (animClass && scale === 1) {
+            pageWrapper.classList.remove('swipe-next', 'swipe-prev');
+            void pageWrapper.offsetWidth;
+            pageWrapper.classList.add(animClass);
+          }
+
+          pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
+
+          annotationContainer.innerHTML = '';
+          page.getAnnotations().then(annotations => {
+            if (!annotations || annotations.length === 0) return;
+            pdfjsLib.AnnotationLayer.render({
+              viewport: displayViewport.clone({ dontFlip: true }),
+              div: annotationContainer,
+              annotations: annotations,
+              page: page,
+              linkService: linkService
+            });
+          });
+
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+      }).catch(err => {
+        pageRendering = false;
+        loading.style.display = 'none';
+        console.error(err);
+      });
+    }
+
+    function queueRenderPage(num, animClass = '') {
+      if (pageRendering) pageNumPending = num;
+      else renderPage(num, animClass);
+    }
+
+    function nextPage() {
+      if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+      resetZoom();
+      pageNum++;
+      queueRenderPage(pageNum, 'swipe-next');
+    }
+
+    function prevPage() {
+      if (!pdfDoc || pageNum <= 1) return;
+      resetZoom();
+      pageNum--;
+      queueRenderPage(pageNum, 'swipe-prev');
+    }
+
+    async function loadOutline() {
+      tocList.innerHTML = '<li class="toc-item">Memuat daftar isi...</li>';
+      try {
+        const outline = await pdfDoc.getOutline();
+        if (!outline || outline.length === 0) {
+          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di file ini.</li>';
+          return;
+        }
+
+        tocList.innerHTML = '';
+        outline.forEach(item => {
+          const li = document.createElement('li');
+          li.className = 'toc-item';
+          li.textContent = item.title;
+          li.addEventListener('click', async () => {
+            if (item.dest) await linkService.goToDestination(item.dest);
+          });
+          tocList.appendChild(li);
+        });
+      } catch (e) {
+        tocList.innerHTML = '<li class="toc-item">Gagal memuat daftar isi.</li>';
+      }
+    }
+
+    btnToc.addEventListener('click', () => {
+      tocModal.style.display = 'flex';
+      mainHeader.classList.remove('show');
+    });
+
+    container.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+      toggleMenu();
+    });
+
+    // Kontrol Sentuhan HP
+    container.addEventListener('touchstart', (e) => {
+      if (document.getElementById('guide-modal').style.display !== 'none' && 
+          document.getElementById('guide-modal').style.display !== '') return;
+      if (tocModal.style.display === 'flex') return;
+
+      hasMoved = false;
+
+      if (e.touches.length === 2) {
+        isPinching = true;
+        isPanning = false;
+        initialDistance = getDistance(e.touches[0], e.touches[1]);
+        initialScale = scale;
+      } else if (e.touches.length === 1) {
+        isPinching = false;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+
+        if (scale > 1.05) {
+          isPanning = true;
+        }
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length === 2) {
+        e.preventDefault();
+        hasMoved = true;
+        const currentDist = getDistance(e.touches[0], e.touches[1]);
+        const scaleChange = currentDist / initialDistance;
+        scale = Math.min(Math.max(initialScale * scaleChange, 1), 4.0);
+        updateTransform();
+      } else if (isPanning && e.touches.length === 1 && scale > 1.05) {
+        e.preventDefault();
+        hasMoved = true;
+        const currentX = e.touches[0].clientX;
+        const currentY = e.touches[0].clientY;
+
+        panX += (currentX - touchStartX);
+        panY += (currentY - touchStartY);
+
+        touchStartX = currentX;
+        touchStartY = currentY;
+
+        pageWrapper.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
+      } else if (e.touches.length === 1) {
+        const diffX = Math.abs(e.touches[0].clientX - touchStartX);
+        const diffY = Math.abs(e.touches[0].clientY - touchStartY);
+        if (diffX > 10 || diffY > 10) {
+          hasMoved = true;
+        }
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchend', (e) => {
+      if (isPinching && e.touches.length < 2) {
+        isPinching = false;
+        if (scale < 1.05) resetZoom();
+        return;
+      }
+
+      if (isPanning && e.touches.length === 0) {
+        isPanning = false;
+      }
+
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+
+      if (e.touches.length === 0 && !isPinching) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const diffX = touchStartX - touchEndX;
+        const diffY = touchStartY - touchEndY;
+
+        if (scale <= 1.05 && Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
+          if (diffX > 0) nextPage();
+          else prevPage();
+          return;
+        }
+
+        if (!hasMoved && scale <= 1.05) {
+          toggleMenu();
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') nextPage();
+      if (e.key === 'ArrowLeft') prevPage();
+      if (e.key === 'Escape') {
+        closeGuideModal();
+        tocModal.style.display = 'none';
+        toggleMenu();
+      }
+    });
+
+    function loadPDFSource(sourceData) {
+      loading.style.display = 'block';
+      loading.textContent = 'Membuka dokumen...';
+      resetZoom();
+
+      pdfjsLib.getDocument(sourceData).promise.then(doc => {
+        pdfDoc = doc;
+        pageNum = 1;
+        renderPage(pageNum);
+        loadOutline();
+      }).catch(err => {
+        loading.textContent = 'Gagal memuat: ' + err.message;
+      });
+    }
+
+    document.getElementById('book-select').addEventListener('change', (e) => {
+      loadPDFSource(e.target.value);
+      mainHeader.classList.remove('show');
+    });
+
+    async function loadMateriFromSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).list();
+        if (error || !data) return;
+
+        const select = document.getElementById('book-select');
+        data.forEach(item => {
+          if (item.name.endsWith('.pdf')) {
+            const { data: urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(item.name);
+            const opt = document.createElement('option');
+            opt.value = urlData.publicUrl;
+            opt.textContent = item.name.replace(/^\d+_/, '').replace('.pdf', '').replace(/_/g, ' ');
+            select.appendChild(opt);
+          }
+        });
+      } catch (err) {
+        console.log('Error memuat list Supabase:', err);
+      }
+    }
+
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!supabaseClient) {
+        const fileReader = new FileReader();
+        fileReader.onload = function() {
+          loadPDFSource({ data: new Uint8Array(this.result) });
+          mainHeader.classList.remove('show');
+        };
+        fileReader.readAsArrayBuffer(file);
+        return;
+      }
+
+      loading.style.display = 'block';
+      loading.textContent = 'Mengunggah ke Supabase...';
+
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).upload(fileName, file);
+
+      if (error) {
+        alert('Gagal mengunggah ke Supabase: ' + error.message);
+        loading.style.display = 'none';
+        return;
+      }
+
+      const { data: publicUrlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+      const publicUrl = publicUrlData.publicUrl;
+
+      const select = document.getElementById('book-select');
+      const newOption = document.createElement('option');
+      newOption.value = publicUrl;
+      newOption.textContent = file.name.replace('.pdf', '').replace(/_/g, ' ');
+      select.appendChild(newOption);
+      select.value = publicUrl;
+
+      loadPDFSource(publicUrl);
+      mainHeader.classList.remove('show');
+    });
+
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        resetZoom();
+        queueRenderPage(pageNum);
+      }
+    });
+
+    loadMateriFromSupabase();
+    loadPDFSource(document.getElementById('book-select').value);
+  </script>
+</body>
+</html>
