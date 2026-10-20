@@ -23,9 +23,9 @@
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      touch-action: none;
       user-select: none;
       -webkit-user-select: none;
+      touch-action: manipulation;
     }
 
     header {
@@ -91,9 +91,6 @@
       font-size: 14px;
       cursor: pointer;
       flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
     #file-input { display: none; }
 
@@ -106,7 +103,7 @@
       position: relative;
       background: #121212;
       padding: 4px;
-      cursor: default;
+      touch-action: none;
     }
 
     #page-wrapper {
@@ -205,19 +202,21 @@
       z-index: 60;
     }
 
+    /* Modal Overlay & Card */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(5px);
-      z-index: 200;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(6px);
+      z-index: 9999;
       display: none;
       align-items: center;
       justify-content: center;
       padding: 16px;
+      touch-action: auto !important;
     }
     .modal-overlay.active { display: flex; }
 
@@ -232,11 +231,7 @@
       flex-direction: column;
       overflow: hidden;
       box-shadow: 0 12px 35px rgba(0,0,0,0.85);
-      animation: modalFadeIn 0.2s ease-out;
-    }
-    @keyframes modalFadeIn {
-      from { transform: scale(0.94); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
+      pointer-events: auto !important;
     }
 
     .modal-header {
@@ -254,9 +249,10 @@
       background: none;
       border: none;
       color: #aaa;
-      font-size: 20px;
+      font-size: 24px;
       cursor: pointer;
-      padding: 4px;
+      padding: 4px 10px;
+      line-height: 1;
     }
 
     .guide-content {
@@ -265,6 +261,7 @@
       font-size: 13px;
       line-height: 1.6;
       color: #d1d2d6;
+      -webkit-overflow-scrolling: touch;
     }
     .guide-item {
       display: flex;
@@ -290,13 +287,13 @@
       color: #fff;
       border: none;
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 15px;
       cursor: pointer;
-      margin-top: 8px;
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+      margin-top: 6px;
+      touch-action: manipulation;
     }
     .btn-start-reading:active { background: #0056b3; }
 
@@ -322,7 +319,7 @@
 </head>
 <body>
 
-  <!-- Menu Navigasi Atas Ringkas -->
+  <!-- Menu Navigasi Atas -->
   <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
@@ -349,18 +346,18 @@
   </div>
 
   <!-- MODAL 1: PANDUAN PENGGUNAAN -->
-  <div id="guide-modal" class="modal-overlay active" onclick="if(event.target === this) closeGuideModal()">
+  <div id="guide-modal" class="modal-overlay active">
     <div class="modal-box">
       <div class="modal-header">
         <span>📖 Panduan ModulKu</span>
-        <button id="btn-close-guide-x" class="modal-close" onclick="closeGuideModal()">✕</button>
+        <button id="btn-close-guide-x" class="modal-close" onclick="closeGuideModal()" ontouchstart="closeGuideModal()">✕</button>
       </div>
       <div class="guide-content">
         <div class="guide-item">
           <span class="guide-icon">👆</span>
           <div class="guide-text">
             <strong>Buka/Tutup Menu</strong>
-            Ketuk 1x area layar atau tombol <b>☰</b> di pojok kanan atas untuk memunculkan/menyembunyikan menu.
+            Ketuk 1x layar atau tombol <b>☰</b> di pojok kanan atas untuk memunculkan atau menyembunyikan menu.
           </div>
         </div>
 
@@ -384,3 +381,457 @@
           <span class="guide-icon">📑</span>
           <div class="guide-text">
             <strong>Daftar Isi</strong>
+            Klik tombol <b>"📑 Isi"</b> untuk melompat langsung ke halaman bab yang dipilih.
+          </div>
+        </div>
+
+        <div class="guide-item">
+          <span class="guide-icon">↔️</span>
+          <div class="guide-text">
+            <strong>Membalik Lembaran</strong>
+            Usap layar ke <b>kiri / kanan</b> di HP, atau gunakan tombol panah keyboard di laptop.
+          </div>
+        </div>
+
+        <div class="guide-item" style="border-bottom: none; margin-bottom: 6px;">
+          <span class="guide-icon">🤏</span>
+          <div class="guide-text">
+            <strong>Memperbesar Teks (Zoom)</strong>
+            Gunakan 2 jari di layar sentuh untuk zoom in dan zoom out.
+          </div>
+        </div>
+
+        <button id="btn-start-reading" class="btn-start-reading" onclick="closeGuideModal()" ontouchstart="closeGuideModal()">Mulai Membaca</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: POPUP DAFTAR ISI -->
+  <div id="toc-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Daftar Bab & Isi</span>
+        <button id="btn-toc-close" class="modal-close" onclick="document.getElementById('toc-modal').classList.remove('active')" ontouchstart="document.getElementById('toc-modal').classList.remove('active')">✕</button>
+      </div>
+      <ul id="toc-list" class="toc-list">
+        <li class="toc-item">Memuat daftar isi...</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Fungsi Tutup Panduan Instan
+    function closeGuideModal() {
+      const modal = document.getElementById('guide-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    // Inisialisasi Supabase
+    const SUPABASE_URL = 'https://jgnhixgbxojcqpfxgjfk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_mCM-3KYuxUNGkipPg-yV1A_gylLQy23';
+    const BUCKET_NAME = 'materi-pdf';
+    
+    let supabaseClient = null;
+    try {
+      if (typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+    } catch(err) {
+      console.warn("Supabase init error:", err);
+    }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let pdfDoc = null;
+    let pageNum = 1;
+    let pageRendering = false;
+    let pageNumPending = null;
+
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let initialDistance = 0;
+    let initialScale = 1;
+    let startPanX = 0;
+    let startPanY = 0;
+    let isPinching = false;
+    let isPanning = false;
+
+    const canvas = document.getElementById('pdf-render');
+    const ctx = canvas.getContext('2d');
+    const pageWrapper = document.getElementById('page-wrapper');
+    const annotationContainer = document.getElementById('annotation-layer');
+    const container = document.getElementById('viewer-container');
+    const loading = document.getElementById('loading-indicator');
+    const pageFloatingText = document.getElementById('floating-page-info');
+    const mainHeader = document.getElementById('main-header');
+    const floatingMenuBtn = document.getElementById('floating-menu-trigger');
+    
+    const btnOpenGuide = document.getElementById('btn-open-guide');
+    const tocModal = document.getElementById('toc-modal');
+    const tocList = document.getElementById('toc-list');
+    const btnToc = document.getElementById('btn-toc');
+
+    function toggleMenu() {
+      if (scale > 1) {
+        resetZoom();
+      } else {
+        mainHeader.classList.toggle('show');
+      }
+    }
+
+    floatingMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMenu();
+    });
+
+    btnOpenGuide.addEventListener('click', () => {
+      document.getElementById('guide-modal').classList.add('active');
+      mainHeader.classList.remove('show');
+    });
+
+    function updateTransform() {
+      if (scale <= 1) {
+        scale = 1;
+        panX = 0;
+        panY = 0;
+      }
+      pageWrapper.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
+    }
+
+    function resetZoom() {
+      scale = 1;
+      panX = 0;
+      panY = 0;
+      pageWrapper.style.transition = 'transform 0.2s ease-out';
+      updateTransform();
+      setTimeout(() => { pageWrapper.style.transition = ''; }, 200);
+    }
+
+    const linkService = {
+      getDestinationHash: () => '#',
+      getAnchorUrl: () => '#',
+      setHash: () => {},
+      executeNamedAction: () => {},
+      goToDestination: async (dest) => {
+        if (!pdfDoc) return;
+        try {
+          let target = dest;
+          if (typeof dest === 'string') target = await pdfDoc.getDestination(dest);
+          if (Array.isArray(target)) {
+            const pageIndex = await pdfDoc.getPageIndex(target[0]);
+            goToPage(pageIndex + 1);
+          }
+        } catch (e) {
+          console.error("Gagal melompat:", e);
+        }
+      }
+    };
+
+    function goToPage(num) {
+      if (!pdfDoc || num < 1 || num > pdfDoc.numPages) return;
+      resetZoom();
+      pageNum = num;
+      queueRenderPage(pageNum, 'swipe-next');
+      tocModal.classList.remove('active');
+    }
+
+    function renderPage(num, animClass = '') {
+      pageRendering = true;
+      loading.style.display = 'block';
+
+      pdfDoc.getPage(num).then(page => {
+        const availableW = container.clientWidth - 8;
+        const availableH = container.clientHeight - 8;
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+
+        const scaleW = availableW / unscaledViewport.width;
+        const scaleH = availableH / unscaledViewport.height;
+        const fitScale = Math.min(scaleW, scaleH);
+
+        const dpr = Math.min(window.devicePixelRatio || 1.5, 2.0);
+        const viewport = page.getViewport({ scale: fitScale * dpr });
+        const displayViewport = page.getViewport({ scale: fitScale });
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        canvas.style.width = `${displayViewport.width}px`;
+        canvas.style.height = `${displayViewport.height}px`;
+
+        pageWrapper.style.width = `${displayViewport.width}px`;
+        pageWrapper.style.height = `${displayViewport.height}px`;
+        pageWrapper.style.setProperty('--scale-factor', `${fitScale}`);
+
+        const renderContext = { canvasContext: ctx, viewport: viewport };
+        page.render(renderContext).promise.then(() => {
+          pageRendering = false;
+          loading.style.display = 'none';
+
+          if (animClass && scale === 1) {
+            pageWrapper.classList.remove('swipe-next', 'swipe-prev');
+            void pageWrapper.offsetWidth;
+            pageWrapper.classList.add(animClass);
+          }
+
+          pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
+
+          annotationContainer.innerHTML = '';
+          page.getAnnotations().then(annotations => {
+            if (!annotations || annotations.length === 0) return;
+            pdfjsLib.AnnotationLayer.render({
+              viewport: displayViewport.clone({ dontFlip: true }),
+              div: annotationContainer,
+              annotations: annotations,
+              page: page,
+              linkService: linkService
+            });
+          });
+
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+      }).catch(err => {
+        pageRendering = false;
+        loading.style.display = 'none';
+        console.error(err);
+      });
+    }
+
+    function queueRenderPage(num, animClass = '') {
+      if (pageRendering) pageNumPending = num;
+      else renderPage(num, animClass);
+    }
+
+    function nextPage() {
+      if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+      resetZoom();
+      pageNum++;
+      queueRenderPage(pageNum, 'swipe-next');
+    }
+
+    function prevPage() {
+      if (!pdfDoc || pageNum <= 1) return;
+      resetZoom();
+      pageNum--;
+      queueRenderPage(pageNum, 'swipe-prev');
+    }
+
+    async function loadOutline() {
+      tocList.innerHTML = '<li class="toc-item">Memuat daftar isi...</li>';
+      try {
+        const outline = await pdfDoc.getOutline();
+        if (!outline || outline.length === 0) {
+          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di file ini.</li>';
+          return;
+        }
+
+        tocList.innerHTML = '';
+        outline.forEach(item => {
+          const li = document.createElement('li');
+          li.className = 'toc-item';
+          li.textContent = item.title;
+          li.addEventListener('click', async () => {
+            if (item.dest) await linkService.goToDestination(item.dest);
+          });
+          tocList.appendChild(li);
+        });
+      } catch (e) {
+        tocList.innerHTML = '<li class="toc-item">Gagal memuat daftar isi.</li>';
+      }
+    }
+
+    btnToc.addEventListener('click', () => {
+      tocModal.classList.add('active');
+      mainHeader.classList.remove('show');
+    });
+
+    container.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+      toggleMenu();
+    });
+
+    // Gestur Sentuh HP
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchMoved = false;
+
+    function getDistance(t1, t2) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    container.addEventListener('touchstart', (e) => {
+      if (document.getElementById('guide-modal').classList.contains('active') || tocModal.classList.contains('active')) return;
+
+      if (e.touches.length === 2) {
+        isPinching = true;
+        isPanning = false;
+        initialDistance = getDistance(e.touches[0], e.touches[1]);
+        initialScale = scale;
+      } else if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchMoved = false;
+
+        if (scale > 1) {
+          isPanning = true;
+          startPanX = e.touches[0].clientX - panX;
+          startPanY = e.touches[0].clientY - panY;
+        }
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length === 2) {
+        e.preventDefault();
+        const currentDist = getDistance(e.touches[0], e.touches[1]);
+        const scaleChange = currentDist / initialDistance;
+        scale = Math.min(Math.max(initialScale * scaleChange, 1), 3.5);
+        updateTransform();
+      } else if (isPanning && e.touches.length === 1 && scale > 1) {
+        e.preventDefault();
+        panX = e.touches[0].clientX - startPanX;
+        panY = e.touches[0].clientY - startPanY;
+        updateTransform();
+      } else if (e.touches.length === 1) {
+        const diffX = Math.abs(e.touches[0].clientX - touchStartX);
+        const diffY = Math.abs(e.touches[0].clientY - touchStartY);
+        if (diffX > 8 || diffY > 8) touchMoved = true;
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchend', (e) => {
+      if (isPinching && e.touches.length < 2) {
+        isPinching = false;
+        if (scale < 1.05) resetZoom();
+      }
+      if (isPanning && e.touches.length === 0) isPanning = false;
+
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+
+      if (e.touches.length === 0 && !isPinching) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const diffX = touchStartX - touchEndX;
+        const diffY = touchStartY - touchEndY;
+
+        if (scale === 1 && Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+          if (diffX > 0) nextPage();
+          else prevPage();
+          return;
+        }
+
+        if (!touchMoved && scale === 1) {
+          toggleMenu();
+        } else if (!touchMoved && scale > 1) {
+          resetZoom();
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') nextPage();
+      if (e.key === 'ArrowLeft') prevPage();
+      if (e.key === 'Escape') {
+        if (document.getElementById('guide-modal').classList.contains('active')) closeGuideModal();
+        else if (tocModal.classList.contains('active')) tocModal.classList.remove('active');
+        else toggleMenu();
+      }
+    });
+
+    function loadPDFSource(sourceData) {
+      loading.style.display = 'block';
+      loading.textContent = 'Membuka dokumen...';
+      resetZoom();
+
+      pdfjsLib.getDocument(sourceData).promise.then(doc => {
+        pdfDoc = doc;
+        pageNum = 1;
+        renderPage(pageNum);
+        loadOutline();
+      }).catch(err => {
+        loading.textContent = 'Gagal memuat: ' + err.message;
+      });
+    }
+
+    document.getElementById('book-select').addEventListener('change', (e) => {
+      loadPDFSource(e.target.value);
+      mainHeader.classList.remove('show');
+    });
+
+    async function loadMateriFromSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).list();
+        if (error || !data) return;
+
+        const select = document.getElementById('book-select');
+        data.forEach(item => {
+          if (item.name.endsWith('.pdf')) {
+            const { data: urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(item.name);
+            const opt = document.createElement('option');
+            opt.value = urlData.publicUrl;
+            opt.textContent = item.name.replace(/^\d+_/, '').replace('.pdf', '');
+            select.appendChild(opt);
+          }
+        });
+      } catch (err) {
+        console.log('Error memuat list Supabase:', err);
+      }
+    }
+
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!supabaseClient) {
+        const fileReader = new FileReader();
+        fileReader.onload = function() {
+          loadPDFSource({ data: new Uint8Array(this.result) });
+          mainHeader.classList.remove('show');
+        };
+        fileReader.readAsArrayBuffer(file);
+        return;
+      }
+
+      loading.style.display = 'block';
+      loading.textContent = 'Mengunggah ke Supabase...';
+
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).upload(fileName, file);
+
+      if (error) {
+        alert('Gagal mengunggah ke Supabase: ' + error.message);
+        loading.style.display = 'none';
+        return;
+      }
+
+      const { data: publicUrlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+      const publicUrl = publicUrlData.publicUrl;
+
+      const select = document.getElementById('book-select');
+      const newOption = document.createElement('option');
+      newOption.value = publicUrl;
+      newOption.textContent = file.name.replace('.pdf', '');
+      select.appendChild(newOption);
+      select.value = publicUrl;
+
+      loadPDFSource(publicUrl);
+      mainHeader.classList.remove('show');
+    });
+
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        resetZoom();
+        queueRenderPage(pageNum);
+      }
+    });
+
+    loadMateriFromSupabase();
+    loadPDFSource(document.getElementById('book-select').value);
+  </script>
+</body>
+</html>
