@@ -23,12 +23,11 @@
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      touch-action: pan-y;
+      touch-action: none; /* Cegah browser default zoom agar zoom canvas bekerja penuh */
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* Header Navigasi */
     header {
       position: absolute;
       top: 0;
@@ -82,7 +81,6 @@
     }
     #file-input { display: none; }
 
-    /* Area Viewer */
     #viewer-container {
       flex: 1;
       display: flex;
@@ -100,7 +98,8 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       border-radius: 4px;
       background: #ffffff;
-      transition: transform 0.15s ease-out, opacity 0.15s ease-out;
+      transform-origin: center center;
+      will-change: transform;
     }
 
     canvas {
@@ -110,7 +109,6 @@
       border-radius: 4px;
     }
 
-    /* Lapisan Link/Anotasi */
     .annotationLayer {
       position: absolute;
       top: 0;
@@ -135,7 +133,6 @@
       pointer-events: auto !important;
     }
 
-    /* Animasi Geser */
     .swipe-next { animation: animSwipeNext 0.22s ease-out; }
     .swipe-prev { animation: animSwipePrev 0.22s ease-out; }
     @keyframes animSwipeNext {
@@ -173,7 +170,6 @@
       z-index: 60;
     }
 
-    /* Modal Menu Daftar Isi */
     #toc-modal {
       position: fixed;
       top: 0;
@@ -225,9 +221,7 @@
       justify-content: space-between;
       color: #eaeaea;
     }
-    .toc-item:active {
-      background: #2a2b36;
-    }
+    .toc-item:active { background: #2a2b36; }
     .toc-close {
       background: none;
       border: none;
@@ -240,7 +234,6 @@
 </head>
 <body>
 
-  <!-- Menu Navigasi Atas -->
   <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
@@ -254,7 +247,6 @@
     </div>
   </header>
 
-  <!-- Area Kanvas Materi & Tautan -->
   <div id="viewer-container">
     <div id="loading-indicator">Memuat...</div>
     <div id="page-wrapper">
@@ -264,7 +256,6 @@
     <div id="floating-page-info">- / -</div>
   </div>
 
-  <!-- Popup Panel Daftar Isi -->
   <div id="toc-modal">
     <div class="toc-box">
       <div class="toc-header">
@@ -280,7 +271,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
       });
     }
 
@@ -290,6 +281,17 @@
     let pageNum = 1;
     let pageRendering = false;
     let pageNumPending = null;
+
+    // --- VARIABEL PINCH ZOOM & PAN ---
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let initialDistance = 0;
+    let initialScale = 1;
+    let startPanX = 0;
+    let startPanY = 0;
+    let isPinching = false;
+    let isPanning = false;
 
     const canvas = document.getElementById('pdf-render');
     const ctx = canvas.getContext('2d');
@@ -304,7 +306,27 @@
     const btnToc = document.getElementById('btn-toc');
     const btnTocClose = document.getElementById('btn-toc-close');
 
-    // Link Service untuk menangani klik / tap link PDF
+    function updateTransform() {
+      // Batasi geseran agar tidak keluar terlalu jauh dari layar saat di-zoom
+      if (scale <= 1) {
+        scale = 1;
+        panX = 0;
+        panY = 0;
+      }
+      pageWrapper.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${scale})`;
+    }
+
+    function resetZoom() {
+      scale = 1;
+      panX = 0;
+      panY = 0;
+      pageWrapper.style.transition = 'transform 0.2s ease-out';
+      updateTransform();
+      setTimeout(() => {
+        pageWrapper.style.transition = '';
+      }, 200);
+    }
+
     const linkService = {
       getDestinationHash: () => '#',
       getAnchorUrl: () => '#',
@@ -314,21 +336,20 @@
         if (!pdfDoc) return;
         try {
           let target = dest;
-          if (typeof dest === 'string') {
-            target = await pdfDoc.getDestination(dest);
-          }
+          if (typeof dest === 'string') target = await pdfDoc.getDestination(dest);
           if (Array.isArray(target)) {
             const pageIndex = await pdfDoc.getPageIndex(target[0]);
             goToPage(pageIndex + 1);
           }
         } catch (e) {
-          console.error("Gagal melompat ke halaman:", e);
+          console.error("Gagal melompat:", e);
         }
       }
     };
 
     function goToPage(num) {
       if (!pdfDoc || num < 1 || num > pdfDoc.numPages) return;
+      resetZoom();
       pageNum = num;
       queueRenderPage(pageNum, 'swipe-next');
       tocModal.classList.remove('active');
@@ -345,11 +366,11 @@
 
         const scaleW = availableW / unscaledViewport.width;
         const scaleH = availableH / unscaledViewport.height;
-        const scale = Math.min(scaleW, scaleH);
+        const fitScale = Math.min(scaleW, scaleH);
 
         const dpr = Math.min(window.devicePixelRatio || 1.5, 2.0);
-        const viewport = page.getViewport({ scale: scale * dpr });
-        const displayViewport = page.getViewport({ scale: scale });
+        const viewport = page.getViewport({ scale: fitScale * dpr });
+        const displayViewport = page.getViewport({ scale: fitScale });
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
@@ -358,16 +379,14 @@
 
         pageWrapper.style.width = `${displayViewport.width}px`;
         pageWrapper.style.height = `${displayViewport.height}px`;
-
-        // Atur variabel CSS penentu posisi link anotasi
-        pageWrapper.style.setProperty('--scale-factor', `${scale}`);
+        pageWrapper.style.setProperty('--scale-factor', `${fitScale}`);
 
         const renderContext = { canvasContext: ctx, viewport: viewport };
         page.render(renderContext).promise.then(() => {
           pageRendering = false;
           loading.style.display = 'none';
 
-          if (animClass) {
+          if (animClass && scale === 1) {
             pageWrapper.classList.remove('swipe-next', 'swipe-prev');
             void pageWrapper.offsetWidth;
             pageWrapper.classList.add(animClass);
@@ -375,11 +394,9 @@
 
           pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
 
-          // Pasang Anotasi Link Internal
           annotationContainer.innerHTML = '';
           page.getAnnotations().then(annotations => {
             if (!annotations || annotations.length === 0) return;
-
             pdfjsLib.AnnotationLayer.render({
               viewport: displayViewport.clone({ dontFlip: true }),
               div: annotationContainer,
@@ -408,17 +425,18 @@
 
     function nextPage() {
       if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+      resetZoom();
       pageNum++;
       queueRenderPage(pageNum, 'swipe-next');
     }
 
     function prevPage() {
       if (!pdfDoc || pageNum <= 1) return;
+      resetZoom();
       pageNum--;
       queueRenderPage(pageNum, 'swipe-prev');
     }
 
-    // Ekstraksi Outline / Bookmarks PDF ke Menu Pop-up
     async function loadOutline() {
       tocList.innerHTML = '<li class="toc-item">Memuat daftar isi...</li>';
       try {
@@ -434,9 +452,7 @@
           li.className = 'toc-item';
           li.textContent = item.title;
           li.addEventListener('click', async () => {
-            if (item.dest) {
-              await linkService.goToDestination(item.dest);
-            }
+            if (item.dest) await linkService.goToDestination(item.dest);
           });
           tocList.appendChild(li);
         });
@@ -445,48 +461,100 @@
       }
     }
 
-    // Tombol Pop-up Daftar Isi
     btnToc.addEventListener('click', () => {
       tocModal.classList.add('active');
       mainHeader.classList.remove('show');
     });
     btnTocClose.addEventListener('click', () => tocModal.classList.remove('active'));
 
-    // Penanganan Gestur Sentuh HP
+    // --- LOGIKA GESTUR: PINCH ZOOM, PAN, SWIPE & DOUBLE TAP ---
     let touchStartX = 0;
     let touchStartY = 0;
     let lastTapTime = 0;
 
+    function getDistance(touch1, touch2) {
+      const dx = touch1.clientX - touch2.clientX;
+      const dy = touch1.clientY - touch2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
     container.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].clientX;
-      touchStartY = e.changedTouches[0].clientY;
-    }, { passive: true });
+      if (e.touches.length === 2) {
+        // Mode Pinch-to-Zoom dengan 2 jari
+        isPinching = true;
+        isPanning = false;
+        initialDistance = getDistance(e.touches[0], e.touches[1]);
+        initialScale = scale;
+      } else if (e.touches.length === 1) {
+        // 1 Jari (Bisa Swipe ganti halaman atau Pan geser kanvas jika dizoom)
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+
+        if (scale > 1) {
+          isPanning = true;
+          startPanX = e.touches[0].clientX - panX;
+          startPanY = e.touches[0].clientY - panY;
+        }
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length === 2) {
+        e.preventDefault();
+        const currentDistance = getDistance(e.touches[0], e.touches[1]);
+        const scaleChange = currentDistance / initialDistance;
+        scale = Math.min(Math.max(initialScale * scaleChange, 1), 3.5); // Batas zoom 1x s.d 3.5x
+        updateTransform();
+      } else if (isPanning && e.touches.length === 1 && scale > 1) {
+        e.preventDefault();
+        panX = e.touches[0].clientX - startPanX;
+        panY = e.touches[0].clientY - startPanY;
+        updateTransform();
+      }
+    }, { passive: false });
 
     container.addEventListener('touchend', (e) => {
-      // Jika pengguna menyentuh langsung link anotasi di layar, jangan anggap swipe/double tap
-      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
-
-      const touchEndX = e.changedTouches[0].clientX;
-      const touchEndY = e.changedTouches[0].clientY;
-      const diffX = touchStartX - touchEndX;
-      const diffY = touchStartY - touchEndY;
-
-      // Geser (Swipe)
-      if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
-        if (diffX > 0) nextPage();
-        else prevPage();
-        return;
+      if (isPinching && e.touches.length < 2) {
+        isPinching = false;
+        if (scale < 1.05) resetZoom();
       }
 
-      // Ketuk 2x (Double Tap) untuk buka/tutup menu
-      const currentTime = new Date().getTime();
-      const tapInterval = currentTime - lastTapTime;
+      if (isPanning && e.touches.length === 0) {
+        isPanning = false;
+      }
 
-      if (tapInterval < 300 && tapInterval > 0) {
-        mainHeader.classList.toggle('show');
-        lastTapTime = 0;
-      } else {
-        lastTapTime = currentTime;
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+
+      // Logika Ketuk Ganda & Usap Halaman (Hanya aktif jika tidak sedang dizoom)
+      if (e.touches.length === 0 && !isPinching) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const diffX = touchStartX - touchEndX;
+        const diffY = touchStartY - touchEndY;
+
+        // Jika ukuran normal (1x), aktifkan Swipe ganti halaman
+        if (scale === 1 && Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
+          if (diffX > 0) nextPage();
+          else prevPage();
+          return;
+        }
+
+        // Ketuk 2x (Double Tap)
+        const currentTime = new Date().getTime();
+        const tapInterval = currentTime - lastTapTime;
+
+        if (tapInterval < 300 && tapInterval > 0) {
+          if (scale > 1) {
+            // Jika sedang dizoom, double tap akan mereset zoom ke normal
+            resetZoom();
+          } else {
+            // Jika ukuran normal, double tap memunculkan / menyembunyikan menu
+            mainHeader.classList.toggle('show');
+          }
+          lastTapTime = 0;
+        } else {
+          lastTapTime = currentTime;
+        }
       }
     }, { passive: true });
 
@@ -494,14 +562,16 @@
       if (e.key === 'ArrowRight') nextPage();
       if (e.key === 'ArrowLeft') prevPage();
       if (e.key === 'Escape') {
-        mainHeader.classList.toggle('show');
+        mainHeader.classList.remove('show');
         tocModal.classList.remove('active');
+        resetZoom();
       }
     });
 
     function loadPDFSource(sourceData) {
       loading.style.display = 'block';
       loading.textContent = 'Membuka dokumen...';
+      resetZoom();
 
       pdfjsLib.getDocument(sourceData).promise.then(doc => {
         pdfDoc = doc;
@@ -530,7 +600,10 @@
     });
 
     window.addEventListener('resize', () => {
-      if (pdfDoc) queueRenderPage(pageNum);
+      if (pdfDoc) {
+        resetZoom();
+        queueRenderPage(pageNum);
+      }
     });
 
     loadPDFSource(document.getElementById('book-select').value);
