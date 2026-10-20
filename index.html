@@ -23,7 +23,7 @@
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      touch-action: none; /* Cegah browser default zoom agar zoom canvas bekerja penuh */
+      touch-action: none;
       user-select: none;
       -webkit-user-select: none;
     }
@@ -40,7 +40,7 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      gap: 8px;
+      gap: 6px;
       z-index: 100;
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       transform: translateY(-100%);
@@ -52,7 +52,7 @@
     .controls-left {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex: 1;
       overflow: hidden;
     }
@@ -65,7 +65,7 @@
       font-size: 13px;
       outline: none;
       flex: 1;
-      max-width: 190px;
+      max-width: 170px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -78,6 +78,16 @@
       font-size: 12px;
       cursor: pointer;
       white-space: nowrap;
+    }
+    .btn-help {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #4ea8de;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
     }
     #file-input { display: none; }
 
@@ -170,46 +180,105 @@
       z-index: 60;
     }
 
-    #toc-modal {
+    /* POP-UP MODAL (PETUNJUK & DAFTAR ISI) */
+    .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(5px);
       z-index: 200;
       display: none;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 16px;
     }
-    #toc-modal.active { display: flex; }
-    .toc-box {
+    .modal-overlay.active { display: flex; }
+
+    .modal-box {
       background: #1e1e24;
       border: 1px solid #333;
-      border-radius: 12px;
+      border-radius: 14px;
       width: 100%;
-      max-width: 360px;
-      max-height: 75vh;
+      max-width: 380px;
+      max-height: 85vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      box-shadow: 0 12px 35px rgba(0,0,0,0.85);
+      animation: modalFadeIn 0.25s ease-out;
     }
-    .toc-header {
-      padding: 12px 16px;
+    @keyframes modalFadeIn {
+      from { transform: scale(0.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 14px 18px;
       background: #25262c;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #333;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 15px;
+      color: #f1f2f6;
     }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    /* Konten Petunjuk Penggunaan */
+    .guide-content {
+      padding: 16px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #d1d2d6;
+    }
+    .guide-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .guide-icon {
+      font-size: 20px;
+      line-height: 1;
+      padding-top: 2px;
+    }
+    .guide-text strong {
+      color: #fff;
+      display: block;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+    .btn-start-reading {
+      background: #007aff;
+      color: #fff;
+      border: none;
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 8px;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+    }
+
+    /* Konten Daftar Isi */
     .toc-list {
       overflow-y: auto;
-      padding: 8px 0;
+      padding: 6px 0;
       list-style: none;
     }
     .toc-item {
@@ -222,18 +291,12 @@
       color: #eaeaea;
     }
     .toc-item:active { background: #2a2b36; }
-    .toc-close {
-      background: none;
-      border: none;
-      color: #aaa;
-      font-size: 18px;
-      cursor: pointer;
-    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
+  <!-- Menu Navigasi Atas -->
   <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
@@ -245,8 +308,10 @@
       <label for="file-input" class="btn-action">📁 File</label>
       <input type="file" id="file-input" accept="application/pdf">
     </div>
+    <button id="btn-open-guide" class="btn-help" title="Petunjuk Penggunaan">❓ Petunjuk</button>
   </header>
 
+  <!-- Area Kanvas Materi -->
   <div id="viewer-container">
     <div id="loading-indicator">Memuat...</div>
     <div id="page-wrapper">
@@ -256,11 +321,73 @@
     <div id="floating-page-info">- / -</div>
   </div>
 
-  <div id="toc-modal">
-    <div class="toc-box">
-      <div class="toc-header">
+  <!-- MODAL 1: PETUNJUK PENGGUNAAN (TAMPIL PERTAMA KALI) -->
+  <div id="guide-modal" class="modal-overlay active">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>📖 Panduan Membaca</span>
+        <button id="btn-close-guide-x" class="modal-close">✕</button>
+      </div>
+      <div class="guide-content">
+        <div class="guide-item">
+          <span class="guide-icon">👆</span>
+          <div class="guide-text">
+            <strong>Ketuk Layar 2 Kali</strong>
+            Ketuk layar HP dua kali dengan cepat untuk memunculkan atau menyembunyikan menu di atas.
+          </div>
+        </div>
+
+        <div class="guide-item">
+          <span class="guide-icon">📚</span>
+          <div class="guide-text">
+            <strong>Membuka Materi Bawaan</strong>
+            Ketuk menu dropdown di atas untuk berpindah antara materi yang sudah disediakan.
+          </div>
+        </div>
+
+        <div class="guide-item">
+          <span class="guide-icon">📁</span>
+          <div class="guide-text">
+            <strong>Membuka File Sendiri</strong>
+            Ketuk tombol <b>"📁 File"</b> untuk membaca file PDF apa pun dari penyimpanan ponsel Anda.
+          </div>
+        </div>
+
+        <div class="guide-item">
+          <span class="guide-icon">📑</span>
+          <div class="guide-text">
+            <strong>Melihat Daftar Isi</strong>
+            Ketuk tombol <b>"📑 Daftar Isi"</b> untuk melihat bab dan melompat langsung ke halaman tujuan.
+          </div>
+        </div>
+
+        <div class="guide-item">
+          <span class="guide-icon">↔️</span>
+          <div class="guide-text">
+            <strong>Membalik Halaman (Geser Jari)</strong>
+            Usap layar ke <b>kiri</b> untuk halaman berikutnya, atau usap ke <b>kanan</b> untuk halaman sebelumnya.
+          </div>
+        </div>
+
+        <div class="guide-item" style="border-bottom: none; margin-bottom: 6px;">
+          <span class="guide-icon">🤏</span>
+          <div class="guide-text">
+            <strong>Memperbesar Teks (Zoom)</strong>
+            Gunakan dua jari untuk memperbesar dokumen, dan geser satu jari saat diperbesar untuk menjelajahi tulisan.
+          </div>
+        </div>
+
+        <button id="btn-start-reading" class="btn-start-reading">Mulai Membaca</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: POPUP DAFTAR ISI -->
+  <div id="toc-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
         <span>Daftar Bab & Isi</span>
-        <button id="btn-toc-close" class="toc-close">✕</button>
+        <button id="btn-toc-close" class="modal-close">✕</button>
       </div>
       <ul id="toc-list" class="toc-list">
         <li class="toc-item">Memuat daftar isi...</li>
@@ -282,7 +409,7 @@
     let pageRendering = false;
     let pageNumPending = null;
 
-    // --- VARIABEL PINCH ZOOM & PAN ---
+    // Variabel Zoom & Pan
     let scale = 1;
     let panX = 0;
     let panY = 0;
@@ -301,13 +428,30 @@
     const loading = document.getElementById('loading-indicator');
     const pageFloatingText = document.getElementById('floating-page-info');
     const mainHeader = document.getElementById('main-header');
+    
+    // Modal Elements
+    const guideModal = document.getElementById('guide-modal');
+    const btnStartReading = document.getElementById('btn-start-reading');
+    const btnCloseGuideX = document.getElementById('btn-close-guide-x');
+    const btnOpenGuide = document.getElementById('btn-open-guide');
+    
     const tocModal = document.getElementById('toc-modal');
     const tocList = document.getElementById('toc-list');
     const btnToc = document.getElementById('btn-toc');
     const btnTocClose = document.getElementById('btn-toc-close');
 
+    // Kontrol Modal Petunjuk
+    function closeGuide() {
+      guideModal.classList.remove('active');
+    }
+    btnStartReading.addEventListener('click', closeGuide);
+    btnCloseGuideX.addEventListener('click', closeGuide);
+    btnOpenGuide.addEventListener('click', () => {
+      guideModal.classList.add('active');
+      mainHeader.classList.remove('show');
+    });
+
     function updateTransform() {
-      // Batasi geseran agar tidak keluar terlalu jauh dari layar saat di-zoom
       if (scale <= 1) {
         scale = 1;
         panX = 0;
@@ -322,9 +466,7 @@
       panY = 0;
       pageWrapper.style.transition = 'transform 0.2s ease-out';
       updateTransform();
-      setTimeout(() => {
-        pageWrapper.style.transition = '';
-      }, 200);
+      setTimeout(() => { pageWrapper.style.transition = ''; }, 200);
     }
 
     const linkService = {
@@ -442,7 +584,7 @@
       try {
         const outline = await pdfDoc.getOutline();
         if (!outline || outline.length === 0) {
-          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di PDF ini.</li>';
+          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di file ini.</li>';
           return;
         }
 
@@ -467,26 +609,26 @@
     });
     btnTocClose.addEventListener('click', () => tocModal.classList.remove('active'));
 
-    // --- LOGIKA GESTUR: PINCH ZOOM, PAN, SWIPE & DOUBLE TAP ---
+    // Gestur Sentuh HP
     let touchStartX = 0;
     let touchStartY = 0;
     let lastTapTime = 0;
 
-    function getDistance(touch1, touch2) {
-      const dx = touch1.clientX - touch2.clientX;
-      const dy = touch1.clientY - touch2.clientY;
+    function getDistance(t1, t2) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
       return Math.sqrt(dx * dx + dy * dy);
     }
 
     container.addEventListener('touchstart', (e) => {
+      if (guideModal.classList.contains('active') || tocModal.classList.contains('active')) return;
+
       if (e.touches.length === 2) {
-        // Mode Pinch-to-Zoom dengan 2 jari
         isPinching = true;
         isPanning = false;
         initialDistance = getDistance(e.touches[0], e.touches[1]);
         initialScale = scale;
       } else if (e.touches.length === 1) {
-        // 1 Jari (Bisa Swipe ganti halaman atau Pan geser kanvas jika dizoom)
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
 
@@ -501,9 +643,9 @@
     container.addEventListener('touchmove', (e) => {
       if (isPinching && e.touches.length === 2) {
         e.preventDefault();
-        const currentDistance = getDistance(e.touches[0], e.touches[1]);
-        const scaleChange = currentDistance / initialDistance;
-        scale = Math.min(Math.max(initialScale * scaleChange, 1), 3.5); // Batas zoom 1x s.d 3.5x
+        const currentDist = getDistance(e.touches[0], e.touches[1]);
+        const scaleChange = currentDist / initialDistance;
+        scale = Math.min(Math.max(initialScale * scaleChange, 1), 3.5);
         updateTransform();
       } else if (isPanning && e.touches.length === 1 && scale > 1) {
         e.preventDefault();
@@ -518,39 +660,28 @@
         isPinching = false;
         if (scale < 1.05) resetZoom();
       }
-
-      if (isPanning && e.touches.length === 0) {
-        isPanning = false;
-      }
+      if (isPanning && e.touches.length === 0) isPanning = false;
 
       if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
 
-      // Logika Ketuk Ganda & Usap Halaman (Hanya aktif jika tidak sedang dizoom)
       if (e.touches.length === 0 && !isPinching) {
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
         const diffX = touchStartX - touchEndX;
         const diffY = touchStartY - touchEndY;
 
-        // Jika ukuran normal (1x), aktifkan Swipe ganti halaman
         if (scale === 1 && Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
           if (diffX > 0) nextPage();
           else prevPage();
           return;
         }
 
-        // Ketuk 2x (Double Tap)
         const currentTime = new Date().getTime();
         const tapInterval = currentTime - lastTapTime;
 
         if (tapInterval < 300 && tapInterval > 0) {
-          if (scale > 1) {
-            // Jika sedang dizoom, double tap akan mereset zoom ke normal
-            resetZoom();
-          } else {
-            // Jika ukuran normal, double tap memunculkan / menyembunyikan menu
-            mainHeader.classList.toggle('show');
-          }
+          if (scale > 1) resetZoom();
+          else mainHeader.classList.toggle('show');
           lastTapTime = 0;
         } else {
           lastTapTime = currentTime;
@@ -564,6 +695,7 @@
       if (e.key === 'Escape') {
         mainHeader.classList.remove('show');
         tocModal.classList.remove('active');
+        guideModal.classList.remove('active');
         resetZoom();
       }
     });
