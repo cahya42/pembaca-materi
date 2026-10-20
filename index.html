@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ModulKu</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
@@ -101,6 +100,7 @@
       position: relative;
       background: #121212;
       padding: 4px;
+      cursor: default;
     }
 
     #page-wrapper {
@@ -181,7 +181,6 @@
       z-index: 60;
     }
 
-    /* POP-UP MODAL */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -291,7 +290,10 @@
     }
     .toc-item:active { background: #2a2b36; }
   </style>
+
+  <!-- Pustaka PDF.js & Supabase JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -320,7 +322,7 @@
     <div id="floating-page-info">- / -</div>
   </div>
 
-  <!-- MODAL 1: PETUNJUK PENGGUNAAN (TAMPIL PERTAMA KALI) -->
+  <!-- MODAL 1: PANDUAN PENGGUNAAN -->
   <div id="guide-modal" class="modal-overlay active">
     <div class="modal-box">
       <div class="modal-header">
@@ -331,52 +333,52 @@
         <div class="guide-item">
           <span class="guide-icon">👆</span>
           <div class="guide-text">
-            <strong>Ketuk Layar 2 Kali</strong>
-            Ketuk layar HP dua kali dengan cepat untuk memunculkan atau menyembunyikan menu di atas.
+            <strong>Klik / Ketuk Layar 2 Kali</strong>
+            Klik 2x tetikus di komputer riba (atau ketuk skrin 2x di telefon) untuk memaparkan atau menyembunyikan menu di atas.
           </div>
         </div>
 
         <div class="guide-item">
           <span class="guide-icon">📚</span>
           <div class="guide-text">
-            <strong>Membuka Materi Bawaan</strong>
-            Ketuk menu dropdown di atas untuk berpindah antara materi yang sudah disediakan.
+            <strong>Membuka Materi Sedia Ada</strong>
+            Pilih menu dropdown di atas untuk menukar modul materi.
           </div>
         </div>
 
         <div class="guide-item">
           <span class="guide-icon">📁</span>
           <div class="guide-text">
-            <strong>Membuka File Sendiri</strong>
-            Ketuk tombol <b>"📁 File"</b> untuk membaca file PDF apa pun dari penyimpanan ponsel Anda.
+            <strong>Memuat Naik Dokumen</strong>
+            Klik butang <b>"📁 File"</b> untuk membuka dan memuat naik fail PDF ke storan awan Supabase.
           </div>
         </div>
 
         <div class="guide-item">
           <span class="guide-icon">📑</span>
           <div class="guide-text">
-            <strong>Melihat Daftar Isi</strong>
-            Ketuk tombol <b>"📑 Daftar Isi"</b> untuk melihat bab dan melompat langsung ke halaman tujuan.
+            <strong>Melihat Isi Kandungan</strong>
+            Klik butang <b>"📑 Daftar Isi"</b> untuk melihat bab dan terus ke halaman yang dipilih.
           </div>
         </div>
 
         <div class="guide-item">
           <span class="guide-icon">↔️</span>
           <div class="guide-text">
-            <strong>Membalik Halaman (Geser Jari)</strong>
-            Usap layar ke <b>kiri</b> untuk halaman berikutnya, atau usap ke <b>kanan</b> untuk halaman sebelumnya.
+            <strong>Navigasi Halaman</strong>
+            Gunakan kekunci anak panah <b>Kiri / Kanan</b> pada papan kekunci, atau leret skrin pada telefon pintar.
           </div>
         </div>
 
         <div class="guide-item" style="border-bottom: none; margin-bottom: 6px;">
           <span class="guide-icon">🤏</span>
           <div class="guide-text">
-            <strong>Memperbesar Teks (Zoom)</strong>
-            Gunakan dua jari untuk memperbesar dokumen, dan geser satu jari saat diperbesar untuk menjelajahi tulisan.
+            <strong>Membesarkan Teks (Zoom)</strong>
+            Gunakan 2 jari pada skrin sentuh atau trackpad untuk zoom in/out.
           </div>
         </div>
 
-        <button id="btn-start-reading" class="btn-start-reading">Mulai Membaca</button>
+        <button id="btn-start-reading" class="btn-start-reading">Mula Membaca</button>
       </div>
     </div>
   </div>
@@ -389,12 +391,19 @@
         <button id="btn-toc-close" class="modal-close">✕</button>
       </div>
       <ul id="toc-list" class="toc-list">
-        <li class="toc-item">Memuat daftar isi...</li>
+        <li class="toc-item">Memuatkan daftar isi...</li>
       </ul>
     </div>
   </div>
 
   <script>
+    // --- KONFIGURASI SUPABASE (SUDAH DIISI) ---
+    const SUPABASE_URL = 'https://jgnhixgbxojcqpfxgjfk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_mCM-3KYuxUNGkipPg-yV1A_gylLQy23';
+    const BUCKET_NAME = 'materi-pdf';
+    
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
@@ -408,7 +417,6 @@
     let pageRendering = false;
     let pageNumPending = null;
 
-    // Variabel Zoom & Pan
     let scale = 1;
     let panX = 0;
     let panY = 0;
@@ -428,7 +436,6 @@
     const pageFloatingText = document.getElementById('floating-page-info');
     const mainHeader = document.getElementById('main-header');
     
-    // Modal Elements
     const guideModal = document.getElementById('guide-modal');
     const btnStartReading = document.getElementById('btn-start-reading');
     const btnCloseGuideX = document.getElementById('btn-close-guide-x');
@@ -439,7 +446,14 @@
     const btnToc = document.getElementById('btn-toc');
     const btnTocClose = document.getElementById('btn-toc-close');
 
-    // Kontrol Modal Petunjuk
+    function toggleMenu() {
+      if (scale > 1) {
+        resetZoom();
+      } else {
+        mainHeader.classList.toggle('show');
+      }
+    }
+
     function closeGuide() {
       guideModal.classList.remove('active');
     }
@@ -579,11 +593,11 @@
     }
 
     async function loadOutline() {
-      tocList.innerHTML = '<li class="toc-item">Memuat daftar isi...</li>';
+      tocList.innerHTML = '<li class="toc-item">Memuatkan daftar isi...</li>';
       try {
         const outline = await pdfDoc.getOutline();
         if (!outline || outline.length === 0) {
-          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di file ini.</li>';
+          tocList.innerHTML = '<li class="toc-item">Daftar isi automatik tidak tersedia dalam fail ini.</li>';
           return;
         }
 
@@ -598,7 +612,7 @@
           tocList.appendChild(li);
         });
       } catch (e) {
-        tocList.innerHTML = '<li class="toc-item">Gagal memuat daftar isi.</li>';
+        tocList.innerHTML = '<li class="toc-item">Gagal memuatkan daftar isi.</li>';
       }
     }
 
@@ -608,7 +622,11 @@
     });
     btnTocClose.addEventListener('click', () => tocModal.classList.remove('active'));
 
-    // Gestur Sentuh HP
+    container.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+      toggleMenu();
+    });
+
     let touchStartX = 0;
     let touchStartY = 0;
     let lastTapTime = 0;
@@ -679,8 +697,7 @@
         const tapInterval = currentTime - lastTapTime;
 
         if (tapInterval < 300 && tapInterval > 0) {
-          if (scale > 1) resetZoom();
-          else mainHeader.classList.toggle('show');
+          toggleMenu();
           lastTapTime = 0;
         } else {
           lastTapTime = currentTime;
@@ -692,10 +709,13 @@
       if (e.key === 'ArrowRight') nextPage();
       if (e.key === 'ArrowLeft') prevPage();
       if (e.key === 'Escape') {
-        mainHeader.classList.remove('show');
-        tocModal.classList.remove('active');
-        guideModal.classList.remove('active');
-        resetZoom();
+        if (guideModal.classList.contains('active')) {
+          guideModal.classList.remove('active');
+        } else if (tocModal.classList.contains('active')) {
+          tocModal.classList.remove('active');
+        } else {
+          toggleMenu();
+        }
       }
     });
 
@@ -710,7 +730,7 @@
         renderPage(pageNum);
         loadOutline();
       }).catch(err => {
-        loading.textContent = 'Gagal memuat: ' + err.message;
+        loading.textContent = 'Gagal memuatkan: ' + err.message;
       });
     }
 
@@ -719,15 +739,57 @@
       mainHeader.classList.remove('show');
     });
 
-    document.getElementById('file-input').addEventListener('change', (e) => {
+    // Mengambil Senarai Materi daripada Storan Supabase secara Automatik
+    async function loadMateriFromSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).list();
+        if (error || !data) return;
+
+        const select = document.getElementById('book-select');
+        data.forEach(item => {
+          if (item.name.endsWith('.pdf')) {
+            const { data: urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(item.name);
+            const opt = document.createElement('option');
+            opt.value = urlData.publicUrl;
+            opt.textContent = item.name.replace(/^\d+_/, '').replace('.pdf', '');
+            select.appendChild(opt);
+          }
+        });
+      } catch (err) {
+        console.log('Ralat memuatkan senarai materi Supabase:', err);
+      }
+    }
+
+    // Memuat Naik Fail ke Storan Supabase apabila butang File Dipilih
+    document.getElementById('file-input').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const fileReader = new FileReader();
-      fileReader.onload = function() {
-        loadPDFSource({ data: new Uint8Array(this.result) });
-        mainHeader.classList.remove('show');
-      };
-      fileReader.readAsArrayBuffer(file);
+
+      loading.style.display = 'block';
+      loading.textContent = 'Memuat naik ke Supabase...';
+
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).upload(fileName, file);
+
+      if (error) {
+        alert('Gagal memuat naik ke Supabase: ' + error.message);
+        loading.style.display = 'none';
+        return;
+      }
+
+      const { data: publicUrlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+      const publicUrl = publicUrlData.publicUrl;
+
+      const select = document.getElementById('book-select');
+      const newOption = document.createElement('option');
+      newOption.value = publicUrl;
+      newOption.textContent = file.name.replace('.pdf', '');
+      select.appendChild(newOption);
+      select.value = publicUrl;
+
+      loadPDFSource(publicUrl);
+      mainHeader.classList.remove('show');
     });
 
     window.addEventListener('resize', () => {
@@ -737,77 +799,8 @@
       }
     });
 
+    loadMateriFromSupabase();
     loadPDFSource(document.getElementById('book-select').value);
-    // Inisialisasi Klien Supabase
-const SUPABASE_URL = https://jgnhixgbxojcqpfxgjfk.supabase.co; // Ganti dengan Project URL Anda
-const SUPABASE_KEY = sb_publishable_mCM-3KYuxUNGkipPg-yV1A_gylLQy23;                  // Ganti dengan anon public key Anda
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// Fungsi Unggah Otomatis saat Tombol File Dipilih
-document.getElementById('file-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  loading.style.display = 'block';
-  loading.textContent = 'Mengunggah ke Supabase...';
-
-  // Nama file unik di bucket
-  const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-
-  // 1. Unggah file ke bucket 'materi-pdf'
-  const { data, error } = await supabaseClient.storage
-    .from('materi-pdf')
-    .upload(fileName, file);
-
-  if (error) {
-    alert('Gagal mengunggah: ' + error.message);
-    loading.style.display = 'none';
-    return;
-  }
-
-  // 2. Dapatkan URL publik file yang baru diunggah
-  const { data: publicUrlData } = supabaseClient.storage
-    .from('materi-pdf')
-    .getPublicUrl(fileName);
-
-  const publicUrl = publicUrlData.publicUrl;
-
-  // 3. Masukkan materi baru ke menu dropdown aplikasi
-  const select = document.getElementById('book-select');
-  const newOption = document.createElement('option');
-  newOption.value = publicUrl;
-  newOption.textContent = file.name.replace('.pdf', '');
-  select.appendChild(newOption);
-  select.value = publicUrl;
-
-  // 4. Langsung buka file tersebut di pembaca ModulKu
-  loadPDFSource(publicUrl);
-  mainHeader.classList.remove('show');
-});
-    async function loadMateriFromSupabase() {
-  const { data, error } = await supabaseClient.storage
-    .from('materi-pdf')
-    .list();
-
-  if (error || !data) return;
-
-  const select = document.getElementById('book-select');
-  data.forEach(item => {
-    if (item.name.endsWith('.pdf')) {
-      const { data: urlData } = supabaseClient.storage
-        .from('materi-pdf')
-        .getPublicUrl(item.name);
-
-      const opt = document.createElement('option');
-      opt.value = urlData.publicUrl;
-      opt.textContent = item.name.replace('.pdf', '');
-      select.appendChild(opt);
-    }
-  });
-}
-
-// Panggil saat aplikasi mulai
-loadMateriFromSupabase();
   </script>
 </body>
 </html>
