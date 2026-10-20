@@ -9,7 +9,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1a1a1a">
+  <meta name="theme-color" content="#121212">
+
+  <!-- CSS PDF.js Viewer untuk Lapisan Anotasi / Tautan Daftar Isi -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,7 +29,7 @@
       -webkit-user-select: none;
     }
 
-    /* Bilah Menu Atas - Mengambang & Bisa Disembunyikan */
+    /* Header Mengambang (Disembunyikan, Muncul Saat Double Tap) */
     header {
       position: absolute;
       top: 0;
@@ -42,10 +45,10 @@
       gap: 8px;
       z-index: 100;
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      transform: translateY(-100%); /* Bawaan: Tersembunyi */
+      transform: translateY(-100%);
     }
     header.show {
-      transform: translateY(0); /* Muncul saat double-tap */
+      transform: translateY(0);
     }
 
     .controls-left {
@@ -80,7 +83,7 @@
     }
     #file-input { display: none; }
 
-    /* Area Pembaca Kanvas PDF */
+    /* Area Viewer */
     #viewer-container {
       flex: 1;
       display: flex;
@@ -91,16 +94,48 @@
       background: #121212;
       padding: 4px;
     }
-    canvas {
-      max-width: 100%;
-      max-height: 100%;
+
+    /* Penampung Kanvas + Anotasi Link Daftar Isi */
+    #page-wrapper {
+      position: relative;
+      display: inline-block;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       border-radius: 4px;
       background: #ffffff;
       transition: transform 0.15s ease-out, opacity 0.15s ease-out;
     }
 
-    /* Animasi Geser Lembaran */
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 4px;
+    }
+
+    /* Lapisan Tautan Klik Daftar Isi */
+    .annotationLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: auto;
+    }
+    .annotationLayer section {
+      position: absolute;
+      text-align: initial;
+    }
+    .annotationLayer .linkAnnotation > a {
+      position: absolute;
+      font-size: 1em;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    /* Animasi Buka Lembaran */
     .swipe-next {
       animation: animSwipeNext 0.22s ease-out;
     }
@@ -116,7 +151,7 @@
       100% { transform: translateX(0) scale(1); opacity: 1; }
     }
 
-    /* Info Halaman Melayang Ringkas di Bawah */
+    /* Nomor Halaman di Bawah */
     #floating-page-info {
       position: absolute;
       bottom: 12px;
@@ -128,7 +163,6 @@
       font-size: 12px;
       pointer-events: none;
       z-index: 50;
-      transition: opacity 0.3s;
     }
 
     #loading-indicator {
@@ -144,11 +178,12 @@
       z-index: 60;
     }
   </style>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
-  <!-- Menu Pilihan Materi (Tersembunyi, Ketuk 2x Layar untuk Muncul) -->
+  <!-- Menu Pilihan Dokumen -->
   <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
@@ -161,15 +196,17 @@
     </div>
   </header>
 
-  <!-- Area Kanvas Materi -->
+  <!-- Area Kanvas Materi & Tautan Daftar Isi -->
   <div id="viewer-container">
     <div id="loading-indicator">Memuat halaman...</div>
-    <canvas id="pdf-render"></canvas>
+    <div id="page-wrapper">
+      <canvas id="pdf-render"></canvas>
+      <div id="annotation-layer" class="annotationLayer"></div>
+    </div>
     <div id="floating-page-info">- / -</div>
   </div>
 
   <script>
-    // Registrasi PWA Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
@@ -185,12 +222,37 @@
 
     const canvas = document.getElementById('pdf-render');
     const ctx = canvas.getContext('2d');
+    const pageWrapper = document.getElementById('page-wrapper');
+    const annotationContainer = document.getElementById('annotation-layer');
     const container = document.getElementById('viewer-container');
     const loading = document.getElementById('loading-indicator');
     const pageFloatingText = document.getElementById('floating-page-info');
     const mainHeader = document.getElementById('main-header');
 
-    // Render Halaman
+    // Link Service untuk menangani klik Daftar Isi
+    const linkService = {
+      getDestinationHash: () => '#',
+      getAnchorUrl: () => '#',
+      setHash: () => {},
+      executeNamedAction: () => {},
+      goToDestination: async (dest) => {
+        if (!pdfDoc) return;
+        try {
+          let explicitDest = dest;
+          if (typeof dest === 'string') {
+            explicitDest = await pdfDoc.getDestination(dest);
+          }
+          if (Array.isArray(explicitDest)) {
+            const pageIndex = await pdfDoc.getPageIndex(explicitDest[0]);
+            pageNum = pageIndex + 1;
+            queueRenderPage(pageNum, 'swipe-next');
+          }
+        } catch (err) {
+          console.error("Gagal melompat ke halaman:", err);
+        }
+      }
+    };
+
     function renderPage(num, animClass = '') {
       pageRendering = true;
       loading.style.display = 'block';
@@ -206,11 +268,15 @@
 
         const dpr = Math.min(window.devicePixelRatio || 1.5, 2.0);
         const viewport = page.getViewport({ scale: scale * dpr });
+        const displayViewport = page.getViewport({ scale: scale });
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        canvas.style.width = `${viewport.width / dpr}px`;
-        canvas.style.height = `${viewport.height / dpr}px`;
+        canvas.style.width = `${displayViewport.width}px`;
+        canvas.style.height = `${displayViewport.height}px`;
+
+        pageWrapper.style.width = `${displayViewport.width}px`;
+        pageWrapper.style.height = `${displayViewport.height}px`;
 
         const renderContext = { canvasContext: ctx, viewport: viewport };
         const renderTask = page.render(renderContext);
@@ -220,12 +286,24 @@
           loading.style.display = 'none';
 
           if (animClass) {
-            canvas.classList.remove('swipe-next', 'swipe-prev');
-            void canvas.offsetWidth; // Trigger reflow animasi
-            canvas.classList.add(animClass);
+            pageWrapper.classList.remove('swipe-next', 'swipe-prev');
+            void pageWrapper.offsetWidth;
+            pageWrapper.classList.add(animClass);
           }
 
           pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
+
+          // Render Lapisan Tautan Daftar Isi
+          annotationContainer.innerHTML = '';
+          page.getAnnotations().then(annotations => {
+            pdfjsLib.AnnotationLayer.render({
+              viewport: displayViewport.clone({ dontFlip: true }),
+              div: annotationContainer,
+              annotations: annotations,
+              page: page,
+              linkService: linkService
+            });
+          });
 
           if (pageNumPending !== null) {
             renderPage(pageNumPending);
@@ -256,7 +334,7 @@
       queueRenderPage(pageNum, 'swipe-prev');
     }
 
-    // --- LOGIKA GESTUR USAP (SWIPE) & KETUK 2X (DOUBLE TAP) ---
+    // Gestur Usap (Swipe) & Ketuk 2x (Double Tap)
     let touchStartX = 0;
     let touchStartY = 0;
     let lastTapTime = 0;
@@ -267,24 +345,24 @@
     }, { passive: true });
 
     container.addEventListener('touchend', (e) => {
+      // Jika pengguna menyentuh link daftar isi, biarkan link yang bekerja
+      if (e.target.closest('.linkAnnotation')) return;
+
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
       const diffX = touchStartX - touchEndX;
       const diffY = touchStartY - touchEndY;
 
-      // Cek apakah gesture adalah SWIPE (horizontal > 45px dan lebih dominan daripada gerakan vertikal)
       if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
-        if (diffX > 0) nextPage(); // Geser ke kiri -> Halaman Selanjutnya
-        else prevPage();          // Geser ke kanan -> Halaman Sebelumnya
+        if (diffX > 0) nextPage();
+        else prevPage();
         return;
       }
 
-      // Cek apakah gesture adalah KETUK DUA KALI (DOUBLE TAP)
       const currentTime = new Date().getTime();
       const tapInterval = currentTime - lastTapTime;
 
       if (tapInterval < 300 && tapInterval > 0) {
-        // Balikkan visibilitas bilah menu
         mainHeader.classList.toggle('show');
         lastTapTime = 0;
       } else {
@@ -292,14 +370,12 @@
       }
     }, { passive: true });
 
-    // Keyboard support di Laptop / Desktop
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') nextPage();
       if (e.key === 'ArrowLeft') prevPage();
       if (e.key === 'Escape') mainHeader.classList.toggle('show');
     });
 
-    // Pemuatan Dokumen
     function loadPDFSource(sourceData) {
       loading.style.display = 'block';
       loading.textContent = 'Membuka dokumen...';
@@ -315,7 +391,7 @@
 
     document.getElementById('book-select').addEventListener('change', (e) => {
       loadPDFSource(e.target.value);
-      mainHeader.classList.remove('show'); // Sembunyikan kembali menu setelah dipilih
+      mainHeader.classList.remove('show');
     });
 
     document.getElementById('file-input').addEventListener('change', (e) => {
@@ -333,7 +409,6 @@
       if (pdfDoc) queueRenderPage(pageNum);
     });
 
-    // Muat materi pertama saat mulai
     loadPDFSource(document.getElementById('book-select').value);
   </script>
 </body>
