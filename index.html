@@ -710,34 +710,42 @@
       }
     }, { passive: false });
 
-    container.addEventListener('touchend', (e) => {
-      if (isPinching && e.touches.length < 2) {
-        isPinching = false;
-        if (scale < 1.05) resetZoom();
-      }
-      if (isPanning && e.touches.length === 0) isPanning = false;
+container.addEventListener('touchend', (e) => {
+  // 1. Matikan flag pinch jika jari sudah kurang dari 2
+  if (isPinching && e.touches.length < 2) {
+    isPinching = false;
+    // Jangan langsung reset ke awal, cukup bulatkan jika nilainya mendekati 1
+    if (scale <= 1.0) resetZoom();
+  }
 
-      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
+  // 2. Matikan flag geser jika seluruh jari sudah diangkat
+  if (isPanning && e.touches.length === 0) {
+    isPanning = false;
+  }
 
-      if (e.touches.length === 0 && !isPinching) {
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const diffX = touchStartX - touchEndX;
-        const diffY = touchStartY - touchEndY;
+  if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
 
-        if (scale === 1 && Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
-          if (diffX > 0) nextPage();
-          else prevPage();
-          return;
-        }
+  // 3. Tangani navigasi lembaran & klik menu
+  if (e.touches.length === 0 && !isPinching) {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartX - touchEndX;
+    const diffY = touchStartY - touchEndY;
 
-        if (!touchMoved && scale === 1) {
-          toggleMenu();
-        } else if (!touchMoved && scale > 1) {
-          resetZoom();
-        }
-      }
-    }, { passive: true });
+    // Ganti halaman (Swipe) HANYA saat ukuran normal (scale === 1)
+    if (scale === 1 && Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+      if (diffX > 0) nextPage();
+      else prevPage();
+      return;
+    }
+
+    // Jika jari benar-benar diam (tidak digeser) dan ukuran normal, buka/tutup menu
+    if (!touchMoved && scale === 1) {
+      toggleMenu();
+    }
+    // Hapus logika resetZoom() otomatis saat disentuh saat scale > 1
+  }
+}, { passive: true });
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') nextPage();
