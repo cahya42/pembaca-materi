@@ -2,98 +2,273 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Pembaca Materi Digital</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a1a; color: #fff; display: flex; flex-direction: column; height: 100vh; }
-    header { background: #2c2c2c; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #3d3d3d; }
-    select { background: #3d3d3d; color: white; border: 1px solid #555; padding: 6px 12px; border-radius: 6px; font-size: 14px; outline: none; }
-    #viewer-container { flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; background: #333; }
-    canvas { max-width: 95%; max-height: 90vh; box-shadow: 0 4px 20px rgba(0,0,0,0.6); border-radius: 4px; transition: transform 0.2s ease; }
-    .page-turn { transform: rotateY(-15deg); }
-    footer { background: #2c2c2c; padding: 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #3d3d3d; }
-    button { background: #007aff; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
-    button:disabled { background: #555; cursor: not-allowed; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #1e1e24;
+      color: #f1f2f6;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: #2f3542;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #404b5a;
+      z-index: 10;
+      gap: 10px;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #a4b0be;
+      white-space: nowrap;
+    }
+    select {
+      background: #1e1e24;
+      color: #ffffff;
+      border: 1px solid #57606f;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      max-width: 65%;
+      text-overflow: ellipsis;
+    }
+    #book-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      background: #131417;
+      overflow: hidden;
+      padding: 10px;
+    }
+    #flipbook {
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    }
+    .page {
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+    .page canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+    #loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.85);
+      padding: 18px 24px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      z-index: 20;
+      color: #f1f2f6;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #3742fa;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    footer {
+      background: #2f3542;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #404b5a;
+      z-index: 10;
+    }
+    button.nav-btn {
+      background: #3742fa;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button.nav-btn:disabled {
+      background: #57606f;
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #page-info {
+      font-size: 13px;
+      color: #ced6e0;
+    }
   </style>
+
+  <!-- PDF.js & PageFlip Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
 </head>
 <body>
 
   <header>
-    <label for="book-select">Pilih Materi:</label>
+    <span class="brand-title">Pilih Materi:</span>
     <select id="book-select">
-      <option value="wawasan-kebangsaan-dakwah-islam.pdf">Modul 1: Wawasan Kebangsaan & Dakwah Islam</option>
-      <option value="retorika.pdf">Modul 2: Retorika</option>
-      <option value="tata-cara-khutbah.pdf">Modul 3: Tata Cara Khutbah</option>
+      <option value="wawasan-kebangsaan-dakwah-islam.pdf">1. Wawasan Kebangsaan Dakwah Islam</option>
+      <option value="retorika.pdf">2. Retorika</option>
+      <option value="tata-cara-khutbah.pdf">3. Tata Cara Khutbah</option>
     </select>
   </header>
 
-  <div id="viewer-container">
-    <canvas id="pdf-render"></canvas>
+  <div id="book-container">
+    <div id="loading-indicator">
+      <div class="spinner"></div>
+      <span id="loading-text">Memuat materi...</span>
+    </div>
+    <div id="flipbook"></div>
   </div>
 
   <footer>
-    <button id="prev-page">‹ Sebelumnya</button>
-    <span id="page-num">Halaman: 1 / -</span>
-    <button id="next-page">Selanjutnya ›</button>
+    <button id="btn-prev" class="nav-btn" disabled>‹ Sebelumnya</button>
+    <span id="page-info">- / -</span>
+    <button id="btn-next" class="nav-btn" disabled>Selanjutnya ›</button>
   </footer>
 
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    let pdfDoc = null;
-    let pageNum = 1;
-    const canvas = document.getElementById('pdf-render');
-    const ctx = canvas.getContext('2d');
+    let pageFlipInstance = null;
+    const loadingElem = document.getElementById('loading-indicator');
+    const loadingText = document.getElementById('loading-text');
+    const bookContainer = document.getElementById('book-container');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const pageInfo = document.getElementById('page-info');
 
-    function renderPage(num) {
-      pdfDoc.getPage(num).then(page => {
-        const viewport = page.getViewport({ scale: 1.5 });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+    async function loadPDFAndInitFlipbook(pdfUrl) {
+      loadingElem.style.display = 'flex';
+      loadingText.textContent = 'Mengunduh file PDF...';
 
-        const renderContext = { canvasContext: ctx, viewport: viewport };
-        page.render(renderContext).promise.then(() => {
-          document.getElementById('page-num').textContent = `Halaman: ${num} / ${pdfDoc.numPages}`;
-          document.getElementById('prev-page').disabled = num <= 1;
-          document.getElementById('next-page').disabled = num >= pdfDoc.numPages;
+      if (pageFlipInstance) {
+        pageFlipInstance.destroy();
+        pageFlipInstance = null;
+      }
+      
+      const flipbookEl = document.getElementById('flipbook');
+      flipbookEl.innerHTML = '';
+
+      try {
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        const pdfDoc = await loadingTask.promise;
+        const numPages = pdfDoc.numPages;
+
+        // Ambil ukuran halaman pertama sebagai proporsi dasar
+        const firstPage = await pdfDoc.getPage(1);
+        const viewport = firstPage.getViewport({ scale: 1.0 });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+
+        // Render seluruh halaman PDF ke elemen canvas
+        for (let i = 1; i <= numPages; i++) {
+          loadingText.textContent = `Memproses halaman ${i} dari ${numPages}...`;
+          const page = await pdfDoc.getPage(i);
+          
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'page';
+          
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Render tajam untuk layar sentuh ponsel
+          const renderViewport = page.getViewport({ scale: 2.0 });
+          canvas.width = renderViewport.width;
+          canvas.height = renderViewport.height;
+
+          await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
+          pageDiv.appendChild(canvas);
+          flipbookEl.appendChild(pageDiv);
+        }
+
+        loadingText.textContent = 'Mempersiapkan buku flipbook...';
+
+        // Tentukan ukuran optimal sesuai dimensi layar HP/Desktop
+        const containerWidth = bookContainer.clientWidth - 20;
+        const containerHeight = bookContainer.clientHeight - 20;
+        const isMobile = window.innerWidth <= 768;
+
+        let displayWidth = isMobile ? containerWidth : Math.min(containerWidth / 2, 500);
+        let displayHeight = (displayWidth * pageHeight) / pageWidth;
+
+        if (displayHeight > containerHeight) {
+          displayHeight = containerHeight;
+          displayWidth = (displayHeight * pageWidth) / pageHeight;
+        }
+
+        pageFlipInstance = new St.PageFlip(flipbookEl, {
+          width: displayWidth,
+          height: displayHeight,
+          size: "fixed",
+          minWidth: 200,
+          maxWidth: 1000,
+          minHeight: 300,
+          maxHeight: 1200,
+          showCover: false,
+          usePortrait: isMobile,
+          mobileScrollSupport: false,
+          flippingTime: 700
         });
-      });
+
+        pageFlipInstance.loadFromHTML(document.querySelectorAll('.page'));
+
+        pageFlipInstance.on('flip', (e) => {
+          const currentPage = e.data + 1;
+          pageInfo.textContent = `${currentPage} / ${numPages}`;
+          btnPrev.disabled = e.data === 0;
+          btnNext.disabled = currentPage >= numPages;
+        });
+
+        pageInfo.textContent = `1 / ${numPages}`;
+        btnPrev.disabled = true;
+        btnNext.disabled = numPages <= 1;
+        loadingElem.style.display = 'none';
+
+      } catch (err) {
+        console.error(err);
+        loadingText.textContent = 'Gagal memuat materi: ' + err.message;
+      }
     }
 
-    function loadPDF(url) {
-      pdfjsLib.getDocument(url).promise.then(pdf => {
-        pdfDoc = pdf;
-        pageNum = 1;
-        renderPage(pageNum);
-      });
-    }
-
-    // Navigasi Halaman dengan Efek Sederhana
-    document.getElementById('prev-page').addEventListener('click', () => {
-      if (pageNum <= 1) return;
-      pageNum--;
-      renderPage(pageNum);
+    btnPrev.addEventListener('click', () => {
+      if (pageFlipInstance) pageFlipInstance.flipPrev();
     });
 
-    document.getElementById('next-page').addEventListener('click', () => {
-      if (pageNum >= pdfDoc.numPages) return;
-      canvas.classList.add('page-turn');
-      setTimeout(() => {
-        pageNum++;
-        renderPage(pageNum);
-        canvas.classList.remove('page-turn');
-      }, 150);
+    btnNext.addEventListener('click', () => {
+      if (pageFlipInstance) pageFlipInstance.flipNext();
     });
 
-    // Pilihan Menu Materi
     document.getElementById('book-select').addEventListener('change', (e) => {
-      loadPDF(e.target.value);
+      loadPDFAndInitFlipbook(e.target.value);
     });
 
-    // Muat materi pertama saat dibuka
-    loadPDF(document.getElementById('book-select').value);
+    // Buka materi pertama secara default saat pertama kali dimuat
+    loadPDFAndInitFlipbook(document.getElementById('book-select').value);
   </script>
 </body>
 </html>
