@@ -2,8 +2,15 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Pembaca Materi Digital</title>
+
+  <!-- Konfigurasi agar bilah browser hilang saat dipasang ke layar utama HP -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#242526">
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -16,29 +23,34 @@
     }
     header {
       background: #242526;
-      padding: 10px 16px;
+      padding: 8px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid #3a3b3c;
-      gap: 10px;
-    }
-    label {
-      font-size: 14px;
-      color: #b0b3b8;
-      font-weight: 600;
-      white-space: nowrap;
+      gap: 8px;
     }
     select {
       background: #3a3b3c;
       color: #ffffff;
       border: 1px solid #4e4f50;
-      padding: 8px 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      flex: 1;
+    }
+    .fullscreen-btn {
+      background: #3a3b3c;
+      border: 1px solid #555;
+      color: #fff;
+      padding: 7px 10px;
       border-radius: 8px;
       font-size: 14px;
-      outline: none;
-      width: 100%;
-      max-width: 320px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #viewer-frame {
       flex: 1;
@@ -52,12 +64,12 @@
 <body>
 
   <header>
-    <label for="book-select">Pilih Materi:</label>
     <select id="book-select">
       <option value="wawasan-kebangsaan-dakwah-islam.pdf">1. Wawasan Kebangsaan</option>
       <option value="retorika.pdf">2. Retorika</option>
       <option value="tata-cara-khutbah.pdf">3. Tata Cara Khutbah</option>
     </select>
+    <button id="btn-fullscreen" class="fullscreen-btn" title="Layar Penuh">⛶</button>
   </header>
 
   <iframe id="viewer-frame" src="wawasan-kebangsaan-dakwah-islam.pdf"></iframe>
@@ -65,9 +77,19 @@
   <script>
     const select = document.getElementById('book-select');
     const frame = document.getElementById('viewer-frame');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
 
     select.addEventListener('change', (e) => {
       frame.src = e.target.value;
+    });
+
+    // Tombol untuk mengaktifkan mode Fullscreen (menyembunyikan address bar)
+    btnFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.log(err));
+      } else {
+        document.exitFullscreen();
+      }
     });
   </script>
 </body>
