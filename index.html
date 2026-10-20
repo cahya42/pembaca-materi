@@ -202,7 +202,7 @@
       z-index: 60;
     }
 
-    /* Modal Overlay & Card */
+    /* Modal Styling */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -397,7 +397,7 @@
           <span class="guide-icon">🤏</span>
           <div class="guide-text">
             <strong>Memperbesar Teks (Zoom)</strong>
-            Gunakan 2 jari di layar sentuh untuk zoom in dan zoom out.
+            Gunakan 2 jari di layar sentuh untuk zoom in/out, lalu geser dengan 1 jari untuk membaca.
           </div>
         </div>
 
@@ -420,7 +420,6 @@
   </div>
 
   <script>
-    // Fungsi Tutup Panduan Instan
     function closeGuideModal() {
       const modal = document.getElementById('guide-modal');
       if (modal) modal.classList.remove('active');
@@ -447,15 +446,17 @@
     let pageRendering = false;
     let pageNumPending = null;
 
+    // --- VARIABEL PINCH ZOOM & PAN YANG STABIL ---
     let scale = 1;
     let panX = 0;
     let panY = 0;
     let initialDistance = 0;
     let initialScale = 1;
-    let startPanX = 0;
-    let startPanY = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
     let isPinching = false;
     let isPanning = false;
+    let hasMoved = false;
 
     const canvas = document.getElementById('pdf-render');
     const ctx = canvas.getContext('2d');
@@ -473,7 +474,7 @@
     const btnToc = document.getElementById('btn-toc');
 
     function toggleMenu() {
-      if (scale > 1) {
+      if (scale > 1.05) {
         resetZoom();
       } else {
         mainHeader.classList.toggle('show');
@@ -491,7 +492,7 @@
     });
 
     function updateTransform() {
-      if (scale <= 1) {
+      if (scale < 1.05) {
         scale = 1;
         panX = 0;
         panY = 0;
@@ -503,9 +504,17 @@
       scale = 1;
       panX = 0;
       panY = 0;
-      pageWrapper.style.transition = 'transform 0.2s ease-out';
-      updateTransform();
-      setTimeout(() => { pageWrapper.style.transition = ''; }, 200);
+      pageWrapper.style.transition = 'transform 0.25s ease-out';
+      pageWrapper.style.transform = 'translate3d(0px, 0px, 0) scale(1)';
+      setTimeout(() => {
+        pageWrapper.style.transition = '';
+      }, 250);
+    }
+
+    function getDistance(t1, t2) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
     }
 
     const linkService = {
@@ -549,304 +558,10 @@
         const scaleH = availableH / unscaledViewport.height;
         const fitScale = Math.min(scaleW, scaleH);
 
-        // Gunakan DPR asli layar (minimal 2.5 atau 3.0) agar teks tajam seperti membaca cetakan asli
-        const dpr = Math.max(window.devicePixelRatio || 2.0, 2.5);
+        // Skala ketajaman optimal (2.2) agar teks tajam tanpa lag
+        const dpr = Math.min(window.devicePixelRatio || 1.5, 2.2);
         const viewport = page.getViewport({ scale: fitScale * dpr });
         const displayViewport = page.getViewport({ scale: fitScale });
 
         canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        canvas.style.width = `${displayViewport.width}px`;
-        canvas.style.height = `${displayViewport.height}px`;
-
-        pageWrapper.style.width = `${displayViewport.width}px`;
-        pageWrapper.style.height = `${displayViewport.height}px`;
-        pageWrapper.style.setProperty('--scale-factor', `${fitScale}`);
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-
-        const renderContext = { 
-          canvasContext: ctx, 
-          viewport: viewport 
-        };
-        page.render(renderContext).promise.then(() => {
-          pageRendering = false;
-          loading.style.display = 'none';
-
-          if (animClass && scale === 1) {
-            pageWrapper.classList.remove('swipe-next', 'swipe-prev');
-            void pageWrapper.offsetWidth;
-            pageWrapper.classList.add(animClass);
-          }
-
-          pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
-
-          annotationContainer.innerHTML = '';
-          page.getAnnotations().then(annotations => {
-            if (!annotations || annotations.length === 0) return;
-            pdfjsLib.AnnotationLayer.render({
-              viewport: displayViewport.clone({ dontFlip: true }),
-              div: annotationContainer,
-              annotations: annotations,
-              page: page,
-              linkService: linkService
-            });
-          });
-
-          if (pageNumPending !== null) {
-            renderPage(pageNumPending);
-            pageNumPending = null;
-          }
-        });
-      }).catch(err => {
-        pageRendering = false;
-        loading.style.display = 'none';
-        console.error(err);
-      });
-    }
-
-    function queueRenderPage(num, animClass = '') {
-      if (pageRendering) pageNumPending = num;
-      else renderPage(num, animClass);
-    }
-
-    function nextPage() {
-      if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
-      resetZoom();
-      pageNum++;
-      queueRenderPage(pageNum, 'swipe-next');
-    }
-
-    function prevPage() {
-      if (!pdfDoc || pageNum <= 1) return;
-      resetZoom();
-      pageNum--;
-      queueRenderPage(pageNum, 'swipe-prev');
-    }
-
-    async function loadOutline() {
-      tocList.innerHTML = '<li class="toc-item">Memuat daftar isi...</li>';
-      try {
-        const outline = await pdfDoc.getOutline();
-        if (!outline || outline.length === 0) {
-          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di file ini.</li>';
-          return;
-        }
-
-        tocList.innerHTML = '';
-        outline.forEach(item => {
-          const li = document.createElement('li');
-          li.className = 'toc-item';
-          li.textContent = item.title;
-          li.addEventListener('click', async () => {
-            if (item.dest) await linkService.goToDestination(item.dest);
-          });
-          tocList.appendChild(li);
-        });
-      } catch (e) {
-        tocList.innerHTML = '<li class="toc-item">Gagal memuat daftar isi.</li>';
-      }
-    }
-
-    btnToc.addEventListener('click', () => {
-      tocModal.classList.add('active');
-      mainHeader.classList.remove('show');
-    });
-
-    container.addEventListener('dblclick', (e) => {
-      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
-      toggleMenu();
-    });
-
-    // Gestur Sentuh HP
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchMoved = false;
-
-    function getDistance(t1, t2) {
-      const dx = t1.clientX - t2.clientX;
-      const dy = t1.clientY - t2.clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    container.addEventListener('touchstart', (e) => {
-      if (document.getElementById('guide-modal').classList.contains('active') || tocModal.classList.contains('active')) return;
-
-      if (e.touches.length === 2) {
-        isPinching = true;
-        isPanning = false;
-        initialDistance = getDistance(e.touches[0], e.touches[1]);
-        initialScale = scale;
-      } else if (e.touches.length === 1) {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-        touchMoved = false;
-
-        if (scale > 1) {
-          isPanning = true;
-          startPanX = e.touches[0].clientX - panX;
-          startPanY = e.touches[0].clientY - panY;
-        }
-      }
-    }, { passive: false });
-
-    container.addEventListener('touchmove', (e) => {
-      if (isPinching && e.touches.length === 2) {
-        e.preventDefault();
-        const currentDist = getDistance(e.touches[0], e.touches[1]);
-        const scaleChange = currentDist / initialDistance;
-        scale = Math.min(Math.max(initialScale * scaleChange, 1), 3.5);
-        updateTransform();
-      } else if (isPanning && e.touches.length === 1 && scale > 1) {
-        e.preventDefault();
-        panX = e.touches[0].clientX - startPanX;
-        panY = e.touches[0].clientY - startPanY;
-        updateTransform();
-      } else if (e.touches.length === 1) {
-        const diffX = Math.abs(e.touches[0].clientX - touchStartX);
-        const diffY = Math.abs(e.touches[0].clientY - touchStartY);
-        if (diffX > 8 || diffY > 8) touchMoved = true;
-      }
-    }, { passive: false });
-
-container.addEventListener('touchend', (e) => {
-  // 1. Matikan flag pinch jika jari sudah kurang dari 2
-  if (isPinching && e.touches.length < 2) {
-    isPinching = false;
-    // Jangan langsung reset ke awal, cukup bulatkan jika nilainya mendekati 1
-    if (scale <= 1.0) resetZoom();
-  }
-
-  // 2. Matikan flag geser jika seluruh jari sudah diangkat
-  if (isPanning && e.touches.length === 0) {
-    isPanning = false;
-  }
-
-  if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
-
-  // 3. Tangani navigasi lembaran & klik menu
-  if (e.touches.length === 0 && !isPinching) {
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const diffX = touchStartX - touchEndX;
-    const diffY = touchStartY - touchEndY;
-
-    // Ganti halaman (Swipe) HANYA saat ukuran normal (scale === 1)
-    if (scale === 1 && Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
-      if (diffX > 0) nextPage();
-      else prevPage();
-      return;
-    }
-
-    // Jika jari benar-benar diam (tidak digeser) dan ukuran normal, buka/tutup menu
-    if (!touchMoved && scale === 1) {
-      toggleMenu();
-    }
-    // Hapus logika resetZoom() otomatis saat disentuh saat scale > 1
-  }
-}, { passive: true });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') nextPage();
-      if (e.key === 'ArrowLeft') prevPage();
-      if (e.key === 'Escape') {
-        if (document.getElementById('guide-modal').classList.contains('active')) closeGuideModal();
-        else if (tocModal.classList.contains('active')) tocModal.classList.remove('active');
-        else toggleMenu();
-      }
-    });
-
-    function loadPDFSource(sourceData) {
-      loading.style.display = 'block';
-      loading.textContent = 'Membuka dokumen...';
-      resetZoom();
-
-      pdfjsLib.getDocument(sourceData).promise.then(doc => {
-        pdfDoc = doc;
-        pageNum = 1;
-        renderPage(pageNum);
-        loadOutline();
-      }).catch(err => {
-        loading.textContent = 'Gagal memuat: ' + err.message;
-      });
-    }
-
-    document.getElementById('book-select').addEventListener('change', (e) => {
-      loadPDFSource(e.target.value);
-      mainHeader.classList.remove('show');
-    });
-
-    async function loadMateriFromSupabase() {
-      if (!supabaseClient) return;
-      try {
-        const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).list();
-        if (error || !data) return;
-
-        const select = document.getElementById('book-select');
-        data.forEach(item => {
-          if (item.name.endsWith('.pdf')) {
-            const { data: urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(item.name);
-            const opt = document.createElement('option');
-            opt.value = urlData.publicUrl;
-            opt.textContent = item.name.replace(/^\d+_/, '').replace('.pdf', '').replace(/_/g, ' ');
-            select.appendChild(opt);
-          }
-        });
-      } catch (err) {
-        console.log('Error memuat list Supabase:', err);
-      }
-    }
-
-    document.getElementById('file-input').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      if (!supabaseClient) {
-        const fileReader = new FileReader();
-        fileReader.onload = function() {
-          loadPDFSource({ data: new Uint8Array(this.result) });
-          mainHeader.classList.remove('show');
-        };
-        fileReader.readAsArrayBuffer(file);
-        return;
-      }
-
-      loading.style.display = 'block';
-      loading.textContent = 'Mengunggah ke Supabase...';
-
-      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-      const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).upload(fileName, file);
-
-      if (error) {
-        alert('Gagal mengunggah ke Supabase: ' + error.message);
-        loading.style.display = 'none';
-        return;
-      }
-
-      const { data: publicUrlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(fileName);
-      const publicUrl = publicUrlData.publicUrl;
-
-      const select = document.getElementById('book-select');
-      const newOption = document.createElement('option');
-      newOption.value = publicUrl;
-      newOption.textContent = file.name.replace('.pdf', '').replace(/_/g, ' ');
-      select.appendChild(newOption);
-      select.value = publicUrl;
-
-      loadPDFSource(publicUrl);
-      mainHeader.classList.remove('show');
-    });
-
-    window.addEventListener('resize', () => {
-      if (pdfDoc) {
-        resetZoom();
-        queueRenderPage(pageNum);
-      }
-    });
-
-    loadMateriFromSupabase();
-    loadPDFSource(document.getElementById('book-select').value);
-  </script>
-</body>
-</html>
+        canvas.width
