@@ -4,93 +4,284 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Pembaca Materi Digital</title>
-
-  <!-- Konfigurasi agar bilah browser hilang saat dipasang ke layar utama HP -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#242526">
-
+  <meta name="theme-color" content="#2c2c2c">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #18191a;
+      background: #1a1a1a;
+      color: #fff;
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
     }
     header {
-      background: #242526;
-      padding: 8px 12px;
+      background: #2c2c2c;
+      padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid #3a3b3c;
+      border-bottom: 1px solid #3d3d3d;
       gap: 8px;
+      z-index: 10;
+    }
+    .controls-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      overflow: hidden;
     }
     select {
-      background: #3a3b3c;
-      color: #ffffff;
-      border: 1px solid #4e4f50;
-      padding: 8px 10px;
-      border-radius: 8px;
+      background: #3d3d3d;
+      color: white;
+      border: 1px solid #555;
+      padding: 6px 10px;
+      border-radius: 6px;
       font-size: 13px;
       outline: none;
       flex: 1;
+      max-width: 220px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .fullscreen-btn {
-      background: #3a3b3c;
-      border: 1px solid #555;
+    .btn-upload {
+      background: #444;
       color: #fff;
-      padding: 7px 10px;
-      border-radius: 8px;
-      font-size: 14px;
+      border: 1px solid #666;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
       cursor: pointer;
+      white-space: nowrap;
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 4px;
     }
-    #viewer-frame {
+    #file-input {
+      display: none;
+    }
+    #viewer-container {
       flex: 1;
-      width: 100%;
-      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      background: #333;
+      padding: 10px;
+    }
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      border-radius: 4px;
+      background: #ffffff;
+      transition: transform 0.2s ease;
+    }
+    .page-turn {
+      transform: rotateY(-12deg) scale(0.98);
+    }
+    #loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.85);
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+    footer {
+      background: #2c2c2c;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #3d3d3d;
+      z-index: 10;
+    }
+    button.nav-btn {
+      background: #007aff;
+      color: white;
       border: none;
-      background: #2b2b2b;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button.nav-btn:disabled {
+      background: #555;
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #page-num {
+      font-size: 13px;
+      color: #ddd;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
   <header>
-    <select id="book-select">
-      <option value="wawasan-kebangsaan-dakwah-islam.pdf">1. Wawasan Kebangsaan</option>
-      <option value="retorika.pdf">2. Retorika</option>
-      <option value="tata-cara-khutbah.pdf">3. Tata Cara Khutbah</option>
-    </select>
-    <button id="btn-fullscreen" class="fullscreen-btn" title="Layar Penuh">⛶</button>
+    <div class="controls-left">
+      <select id="book-select">
+        <option value="wawasan-kebangsaan-dakwah-islam.pdf">1. Wawasan Kebangsaan</option>
+        <option value="retorika.pdf">2. Retorika</option>
+        <option value="tata-cara-khutbah.pdf">3. Tata Cara Khutbah</option>
+      </select>
+
+      <!-- Tombol Memilih File Sendiri dari HP/PC -->
+      <label for="file-input" class="btn-upload">📁 Pilih File</label>
+      <input type="file" id="file-input" accept="application/pdf">
+    </div>
   </header>
 
-  <iframe id="viewer-frame" src="wawasan-kebangsaan-dakwah-islam.pdf"></iframe>
+  <div id="viewer-container">
+    <div id="loading-indicator">Memuat halaman...</div>
+    <canvas id="pdf-render"></canvas>
+  </div>
+
+  <footer>
+    <button id="prev-page" class="nav-btn" disabled>‹ Sebelumnya</button>
+    <span id="page-num">Halaman: - / -</span>
+    <button id="next-page" class="nav-btn" disabled>Selanjutnya ›</button>
+  </footer>
 
   <script>
-    const select = document.getElementById('book-select');
-    const frame = document.getElementById('viewer-frame');
-    const btnFullscreen = document.getElementById('btn-fullscreen');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    select.addEventListener('change', (e) => {
-      frame.src = e.target.value;
-    });
+    let pdfDoc = null;
+    let pageNum = 1;
+    let pageRendering = false;
+    let pageNumPending = null;
 
-    // Tombol untuk mengaktifkan mode Fullscreen (menyembunyikan address bar)
-    btnFullscreen.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => console.log(err));
+    const canvas = document.getElementById('pdf-render');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('viewer-container');
+    const loading = document.getElementById('loading-indicator');
+    const pageNumText = document.getElementById('page-num');
+    const btnPrev = document.getElementById('prev-page');
+    const btnNext = document.getElementById('next-page');
+
+    function renderPage(num) {
+      pageRendering = true;
+      loading.style.display = 'block';
+
+      pdfDoc.getPage(num).then(page => {
+        const availableW = container.clientWidth - 20;
+        const availableH = container.clientHeight - 20;
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+
+        const scaleW = availableW / unscaledViewport.width;
+        const scaleH = availableH / unscaledViewport.height;
+        const scale = Math.min(scaleW, scaleH);
+
+        const dpr = Math.min(window.devicePixelRatio || 1.5, 2.0);
+        const viewport = page.getViewport({ scale: scale * dpr });
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        canvas.style.width = `${viewport.width / dpr}px`;
+        canvas.style.height = `${viewport.height / dpr}px`;
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport
+        };
+
+        const renderTask = page.render(renderContext);
+        renderTask.promise.then(() => {
+          pageRendering = false;
+          loading.style.display = 'none';
+          pageNumText.textContent = `Halaman: ${num} / ${pdfDoc.numPages}`;
+          btnPrev.disabled = num <= 1;
+          btnNext.disabled = num >= pdfDoc.numPages;
+
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
+        });
+      }).catch(err => {
+        pageRendering = false;
+        loading.style.display = 'none';
+        console.error(err);
+      });
+    }
+
+    function queueRenderPage(num) {
+      if (pageRendering) {
+        pageNumPending = num;
       } else {
-        document.exitFullscreen();
+        renderPage(num);
       }
+    }
+
+    function onPrevPage() {
+      if (pageNum <= 1) return;
+      pageNum--;
+      queueRenderPage(pageNum);
+    }
+
+    function onNextPage() {
+      if (pageNum >= pdfDoc.numPages) return;
+      canvas.classList.add('page-turn');
+      setTimeout(() => {
+        pageNum++;
+        queueRenderPage(pageNum);
+        canvas.classList.remove('page-turn');
+      }, 120);
+    }
+
+    btnPrev.addEventListener('click', onPrevPage);
+    btnNext.addEventListener('click', onNextPage);
+
+    // Fungsi membuka file PDF (dari link atau data biner)
+    function loadPDFSource(sourceData) {
+      loading.style.display = 'block';
+      loading.textContent = 'Membuka dokumen...';
+
+      pdfjsLib.getDocument(sourceData).promise.then(doc => {
+        pdfDoc = doc;
+        pageNum = 1;
+        renderPage(pageNum);
+      }).catch(err => {
+        loading.textContent = 'Gagal memuat: ' + err.message;
+      });
+    }
+
+    // 1. Membuka dari pilihan menu dropdown
+    document.getElementById('book-select').addEventListener('change', (e) => {
+      loadPDFSource(e.target.value);
     });
+
+    // 2. Membuka file sendiri dari memori HP / Komputer
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const fileReader = new FileReader();
+      fileReader.onload = function() {
+        const typedArray = new Uint8Array(this.result);
+        loadPDFSource({ data: typedArray });
+      };
+      fileReader.readAsArrayBuffer(file);
+    });
+
+    // Sesuaikan kanvas saat layar diputar
+    window.addEventListener('resize', () => {
+      if (pdfDoc) queueRenderPage(pageNum);
+    });
+
+    // Jalankan modul pertama secara bawaan
+    loadPDFSource(document.getElementById('book-select').value);
   </script>
 </body>
 </html>
