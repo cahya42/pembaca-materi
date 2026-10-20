@@ -11,7 +11,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#121212">
 
-  <!-- CSS PDF.js Viewer untuk Lapisan Anotasi / Tautan Daftar Isi -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
 
   <style>
@@ -29,7 +28,7 @@
       -webkit-user-select: none;
     }
 
-    /* Header Mengambang (Disembunyikan, Muncul Saat Double Tap) */
+    /* Header Navigasi */
     header {
       position: absolute;
       top: 0;
@@ -67,11 +66,11 @@
       font-size: 13px;
       outline: none;
       flex: 1;
-      max-width: 220px;
+      max-width: 190px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .btn-upload {
+    .btn-action {
       background: #3a3a3a;
       color: #fff;
       border: 1px solid #555;
@@ -95,7 +94,6 @@
       padding: 4px;
     }
 
-    /* Penampung Kanvas + Anotasi Link Daftar Isi */
     #page-wrapper {
       position: relative;
       display: inline-block;
@@ -112,14 +110,15 @@
       border-radius: 4px;
     }
 
-    /* Lapisan Tautan Klik Daftar Isi */
+    /* Lapisan Link/Anotasi */
     .annotationLayer {
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      pointer-events: auto;
+      pointer-events: auto !important;
+      z-index: 20;
     }
     .annotationLayer section {
       position: absolute;
@@ -133,15 +132,12 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
+      pointer-events: auto !important;
     }
 
-    /* Animasi Buka Lembaran */
-    .swipe-next {
-      animation: animSwipeNext 0.22s ease-out;
-    }
-    .swipe-prev {
-      animation: animSwipePrev 0.22s ease-out;
-    }
+    /* Animasi Geser */
+    .swipe-next { animation: animSwipeNext 0.22s ease-out; }
+    .swipe-prev { animation: animSwipePrev 0.22s ease-out; }
     @keyframes animSwipeNext {
       0% { transform: translateX(40px) scale(0.96); opacity: 0.5; }
       100% { transform: translateX(0) scale(1); opacity: 1; }
@@ -151,7 +147,6 @@
       100% { transform: translateX(0) scale(1); opacity: 1; }
     }
 
-    /* Nomor Halaman di Bawah */
     #floating-page-info {
       position: absolute;
       bottom: 12px;
@@ -177,13 +172,75 @@
       display: none;
       z-index: 60;
     }
-  </style>
 
+    /* Modal Menu Daftar Isi */
+    #toc-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #toc-modal.active { display: flex; }
+    .toc-box {
+      background: #1e1e24;
+      border: 1px solid #333;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 360px;
+      max-height: 75vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+    .toc-header {
+      padding: 12px 16px;
+      background: #25262c;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .toc-list {
+      overflow-y: auto;
+      padding: 8px 0;
+      list-style: none;
+    }
+    .toc-item {
+      padding: 12px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid #2a2a30;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      color: #eaeaea;
+    }
+    .toc-item:active {
+      background: #2a2b36;
+    }
+    .toc-close {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 18px;
+      cursor: pointer;
+    }
+  </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
-  <!-- Menu Pilihan Dokumen -->
+  <!-- Menu Navigasi Atas -->
   <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
@@ -191,14 +248,15 @@
         <option value="retorika.pdf">2. Retorika</option>
         <option value="tata-cara-khutbah.pdf">3. Tata Cara Khutbah</option>
       </select>
-      <label for="file-input" class="btn-upload">📁 Pilih File</label>
+      <button id="btn-toc" class="btn-action">📑 Daftar Isi</button>
+      <label for="file-input" class="btn-action">📁 File</label>
       <input type="file" id="file-input" accept="application/pdf">
     </div>
   </header>
 
-  <!-- Area Kanvas Materi & Tautan Daftar Isi -->
+  <!-- Area Kanvas Materi & Tautan -->
   <div id="viewer-container">
-    <div id="loading-indicator">Memuat halaman...</div>
+    <div id="loading-indicator">Memuat...</div>
     <div id="page-wrapper">
       <canvas id="pdf-render"></canvas>
       <div id="annotation-layer" class="annotationLayer"></div>
@@ -206,10 +264,23 @@
     <div id="floating-page-info">- / -</div>
   </div>
 
+  <!-- Popup Panel Daftar Isi -->
+  <div id="toc-modal">
+    <div class="toc-box">
+      <div class="toc-header">
+        <span>Daftar Bab & Isi</span>
+        <button id="btn-toc-close" class="toc-close">✕</button>
+      </div>
+      <ul id="toc-list" class="toc-list">
+        <li class="toc-item">Memuat daftar isi...</li>
+      </ul>
+    </div>
+  </div>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
+        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
       });
     }
 
@@ -228,8 +299,12 @@
     const loading = document.getElementById('loading-indicator');
     const pageFloatingText = document.getElementById('floating-page-info');
     const mainHeader = document.getElementById('main-header');
+    const tocModal = document.getElementById('toc-modal');
+    const tocList = document.getElementById('toc-list');
+    const btnToc = document.getElementById('btn-toc');
+    const btnTocClose = document.getElementById('btn-toc-close');
 
-    // Link Service untuk menangani klik Daftar Isi
+    // Link Service untuk menangani klik / tap link PDF
     const linkService = {
       getDestinationHash: () => '#',
       getAnchorUrl: () => '#',
@@ -238,20 +313,26 @@
       goToDestination: async (dest) => {
         if (!pdfDoc) return;
         try {
-          let explicitDest = dest;
+          let target = dest;
           if (typeof dest === 'string') {
-            explicitDest = await pdfDoc.getDestination(dest);
+            target = await pdfDoc.getDestination(dest);
           }
-          if (Array.isArray(explicitDest)) {
-            const pageIndex = await pdfDoc.getPageIndex(explicitDest[0]);
-            pageNum = pageIndex + 1;
-            queueRenderPage(pageNum, 'swipe-next');
+          if (Array.isArray(target)) {
+            const pageIndex = await pdfDoc.getPageIndex(target[0]);
+            goToPage(pageIndex + 1);
           }
-        } catch (err) {
-          console.error("Gagal melompat ke halaman:", err);
+        } catch (e) {
+          console.error("Gagal melompat ke halaman:", e);
         }
       }
     };
+
+    function goToPage(num) {
+      if (!pdfDoc || num < 1 || num > pdfDoc.numPages) return;
+      pageNum = num;
+      queueRenderPage(pageNum, 'swipe-next');
+      tocModal.classList.remove('active');
+    }
 
     function renderPage(num, animClass = '') {
       pageRendering = true;
@@ -278,10 +359,11 @@
         pageWrapper.style.width = `${displayViewport.width}px`;
         pageWrapper.style.height = `${displayViewport.height}px`;
 
-        const renderContext = { canvasContext: ctx, viewport: viewport };
-        const renderTask = page.render(renderContext);
+        // Atur variabel CSS penentu posisi link anotasi
+        pageWrapper.style.setProperty('--scale-factor', `${scale}`);
 
-        renderTask.promise.then(() => {
+        const renderContext = { canvasContext: ctx, viewport: viewport };
+        page.render(renderContext).promise.then(() => {
           pageRendering = false;
           loading.style.display = 'none';
 
@@ -293,9 +375,11 @@
 
           pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
 
-          // Render Lapisan Tautan Daftar Isi
+          // Pasang Anotasi Link Internal
           annotationContainer.innerHTML = '';
           page.getAnnotations().then(annotations => {
+            if (!annotations || annotations.length === 0) return;
+
             pdfjsLib.AnnotationLayer.render({
               viewport: displayViewport.clone({ dontFlip: true }),
               div: annotationContainer,
@@ -334,7 +418,41 @@
       queueRenderPage(pageNum, 'swipe-prev');
     }
 
-    // Gestur Usap (Swipe) & Ketuk 2x (Double Tap)
+    // Ekstraksi Outline / Bookmarks PDF ke Menu Pop-up
+    async function loadOutline() {
+      tocList.innerHTML = '<li class="toc-item">Memuat daftar isi...</li>';
+      try {
+        const outline = await pdfDoc.getOutline();
+        if (!outline || outline.length === 0) {
+          tocList.innerHTML = '<li class="toc-item">Daftar isi otomatis tidak tersedia di PDF ini.</li>';
+          return;
+        }
+
+        tocList.innerHTML = '';
+        outline.forEach(item => {
+          const li = document.createElement('li');
+          li.className = 'toc-item';
+          li.textContent = item.title;
+          li.addEventListener('click', async () => {
+            if (item.dest) {
+              await linkService.goToDestination(item.dest);
+            }
+          });
+          tocList.appendChild(li);
+        });
+      } catch (e) {
+        tocList.innerHTML = '<li class="toc-item">Gagal memuat daftar isi.</li>';
+      }
+    }
+
+    // Tombol Pop-up Daftar Isi
+    btnToc.addEventListener('click', () => {
+      tocModal.classList.add('active');
+      mainHeader.classList.remove('show');
+    });
+    btnTocClose.addEventListener('click', () => tocModal.classList.remove('active'));
+
+    // Penanganan Gestur Sentuh HP
     let touchStartX = 0;
     let touchStartY = 0;
     let lastTapTime = 0;
@@ -345,20 +463,22 @@
     }, { passive: true });
 
     container.addEventListener('touchend', (e) => {
-      // Jika pengguna menyentuh link daftar isi, biarkan link yang bekerja
-      if (e.target.closest('.linkAnnotation')) return;
+      // Jika pengguna menyentuh langsung link anotasi di layar, jangan anggap swipe/double tap
+      if (e.target.closest('.linkAnnotation') || e.target.closest('a')) return;
 
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
       const diffX = touchStartX - touchEndX;
       const diffY = touchStartY - touchEndY;
 
+      // Geser (Swipe)
       if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
         if (diffX > 0) nextPage();
         else prevPage();
         return;
       }
 
+      // Ketuk 2x (Double Tap) untuk buka/tutup menu
       const currentTime = new Date().getTime();
       const tapInterval = currentTime - lastTapTime;
 
@@ -373,7 +493,10 @@
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') nextPage();
       if (e.key === 'ArrowLeft') prevPage();
-      if (e.key === 'Escape') mainHeader.classList.toggle('show');
+      if (e.key === 'Escape') {
+        mainHeader.classList.toggle('show');
+        tocModal.classList.remove('active');
+      }
     });
 
     function loadPDFSource(sourceData) {
@@ -384,6 +507,7 @@
         pdfDoc = doc;
         pageNum = 1;
         renderPage(pageNum);
+        loadOutline();
       }).catch(err => {
         loading.textContent = 'Gagal memuat: ' + err.message;
       });
