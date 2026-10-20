@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ModulKu</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
@@ -737,6 +738,76 @@
     });
 
     loadPDFSource(document.getElementById('book-select').value);
+    // Inisialisasi Klien Supabase
+const SUPABASE_URL = https://jgnhixgbxojcqpfxgjfk.supabase.co; // Ganti dengan Project URL Anda
+const SUPABASE_KEY = sb_publishable_mCM-3KYuxUNGkipPg-yV1A_gylLQy23;                  // Ganti dengan anon public key Anda
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Fungsi Unggah Otomatis saat Tombol File Dipilih
+document.getElementById('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  loading.style.display = 'block';
+  loading.textContent = 'Mengunggah ke Supabase...';
+
+  // Nama file unik di bucket
+  const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+
+  // 1. Unggah file ke bucket 'materi-pdf'
+  const { data, error } = await supabaseClient.storage
+    .from('materi-pdf')
+    .upload(fileName, file);
+
+  if (error) {
+    alert('Gagal mengunggah: ' + error.message);
+    loading.style.display = 'none';
+    return;
+  }
+
+  // 2. Dapatkan URL publik file yang baru diunggah
+  const { data: publicUrlData } = supabaseClient.storage
+    .from('materi-pdf')
+    .getPublicUrl(fileName);
+
+  const publicUrl = publicUrlData.publicUrl;
+
+  // 3. Masukkan materi baru ke menu dropdown aplikasi
+  const select = document.getElementById('book-select');
+  const newOption = document.createElement('option');
+  newOption.value = publicUrl;
+  newOption.textContent = file.name.replace('.pdf', '');
+  select.appendChild(newOption);
+  select.value = publicUrl;
+
+  // 4. Langsung buka file tersebut di pembaca ModulKu
+  loadPDFSource(publicUrl);
+  mainHeader.classList.remove('show');
+});
+    async function loadMateriFromSupabase() {
+  const { data, error } = await supabaseClient.storage
+    .from('materi-pdf')
+    .list();
+
+  if (error || !data) return;
+
+  const select = document.getElementById('book-select');
+  data.forEach(item => {
+    if (item.name.endsWith('.pdf')) {
+      const { data: urlData } = supabaseClient.storage
+        .from('materi-pdf')
+        .getPublicUrl(item.name);
+
+      const opt = document.createElement('option');
+      opt.value = urlData.publicUrl;
+      opt.textContent = item.name.replace('.pdf', '');
+      select.appendChild(opt);
+    }
+  });
+}
+
+// Panggil saat aplikasi mulai
+loadMateriFromSupabase();
   </script>
 </body>
 </html>
