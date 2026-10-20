@@ -5,34 +5,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Pembaca Materi Digital</title>
   
-  <!-- Manifest & Meta PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#2c2c2c">
+  <meta name="theme-color" content="#1a1a1a">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #1a1a1a;
+      background: #121212;
       color: #fff;
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
+      touch-action: pan-y;
+      user-select: none;
+      -webkit-user-select: none;
     }
+
+    /* Bilah Menu Atas - Mengambang & Bisa Disembunyikan */
     header {
-      background: #2c2c2c;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(30, 30, 30, 0.95);
+      backdrop-filter: blur(8px);
       padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid #3d3d3d;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       gap: 8px;
-      z-index: 10;
+      z-index: 100;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateY(-100%); /* Bawaan: Tersembunyi */
     }
+    header.show {
+      transform: translateY(0); /* Muncul saat double-tap */
+    }
+
     .controls-left {
       display: flex;
       align-items: center;
@@ -41,43 +56,31 @@
       overflow: hidden;
     }
     select {
-      background: #3d3d3d;
+      background: #2c2c2c;
       color: white;
-      border: 1px solid #555;
-      padding: 6px 10px;
+      border: 1px solid #444;
+      padding: 7px 10px;
       border-radius: 6px;
       font-size: 13px;
       outline: none;
       flex: 1;
-      max-width: 200px;
+      max-width: 220px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .btn-upload {
-      background: #444;
+      background: #3a3a3a;
       color: #fff;
-      border: 1px solid #666;
-      padding: 6px 10px;
+      border: 1px solid #555;
+      padding: 7px 10px;
       border-radius: 6px;
       font-size: 12px;
       cursor: pointer;
       white-space: nowrap;
     }
     #file-input { display: none; }
-    
-    .btn-install {
-      background: #2e7d32;
-      color: #fff;
-      border: 1px solid #4caf50;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      display: none; /* Muncul jika browser mendukung instalasi */
-      white-space: nowrap;
-    }
 
+    /* Area Pembaca Kanvas PDF */
     #viewer-container {
       flex: 1;
       display: flex;
@@ -85,20 +88,49 @@
       align-items: center;
       overflow: hidden;
       position: relative;
-      background: #333;
-      padding: 10px;
+      background: #121212;
+      padding: 4px;
     }
     canvas {
       max-width: 100%;
       max-height: 100%;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       border-radius: 4px;
       background: #ffffff;
-      transition: transform 0.2s ease;
+      transition: transform 0.15s ease-out, opacity 0.15s ease-out;
     }
-    .page-turn {
-      transform: rotateY(-12deg) scale(0.98);
+
+    /* Animasi Geser Lembaran */
+    .swipe-next {
+      animation: animSwipeNext 0.22s ease-out;
     }
+    .swipe-prev {
+      animation: animSwipePrev 0.22s ease-out;
+    }
+    @keyframes animSwipeNext {
+      0% { transform: translateX(40px) scale(0.96); opacity: 0.5; }
+      100% { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    @keyframes animSwipePrev {
+      0% { transform: translateX(-40px) scale(0.96); opacity: 0.5; }
+      100% { transform: translateX(0) scale(1); opacity: 1; }
+    }
+
+    /* Info Halaman Melayang Ringkas di Bawah */
+    #floating-page-info {
+      position: absolute;
+      bottom: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      color: #ddd;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 50;
+      transition: opacity 0.3s;
+    }
+
     #loading-indicator {
       position: absolute;
       top: 50%;
@@ -109,41 +141,15 @@
       border-radius: 8px;
       font-size: 13px;
       display: none;
-    }
-    footer {
-      background: #2c2c2c;
-      padding: 10px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px solid #3d3d3d;
-      z-index: 10;
-    }
-    button.nav-btn {
-      background: #007aff;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    button.nav-btn:disabled {
-      background: #555;
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    #page-num {
-      font-size: 13px;
-      color: #ddd;
+      z-index: 60;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
-  <header>
+  <!-- Menu Pilihan Materi (Tersembunyi, Ketuk 2x Layar untuk Muncul) -->
+  <header id="main-header">
     <div class="controls-left">
       <select id="book-select">
         <option value="wawasan-kebangsaan-dakwah-islam.pdf">1. Wawasan Kebangsaan</option>
@@ -153,50 +159,23 @@
       <label for="file-input" class="btn-upload">📁 Pilih File</label>
       <input type="file" id="file-input" accept="application/pdf">
     </div>
-    <button id="btn-install" class="btn-install">📥 Pasang App</button>
   </header>
 
+  <!-- Area Kanvas Materi -->
   <div id="viewer-container">
     <div id="loading-indicator">Memuat halaman...</div>
     <canvas id="pdf-render"></canvas>
+    <div id="floating-page-info">- / -</div>
   </div>
 
-  <footer>
-    <button id="prev-page" class="nav-btn" disabled>‹ Sebelumnya</button>
-    <span id="page-num">Halaman: - / -</span>
-    <button id="next-page" class="nav-btn" disabled>Selanjutnya ›</button>
-  </footer>
-
   <script>
-    // Registrasi Service Worker untuk PWA
+    // Registrasi PWA Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
       });
     }
 
-    // Tangani Event Instalasi PWA
-    let deferredPrompt;
-    const btnInstall = document.getElementById('btn-install');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      btnInstall.style.display = 'block';
-    });
-
-    btnInstall.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          btnInstall.style.display = 'none';
-        }
-        deferredPrompt = null;
-      }
-    });
-
-    // Inisialisasi PDF.js
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     let pdfDoc = null;
@@ -208,17 +187,17 @@
     const ctx = canvas.getContext('2d');
     const container = document.getElementById('viewer-container');
     const loading = document.getElementById('loading-indicator');
-    const pageNumText = document.getElementById('page-num');
-    const btnPrev = document.getElementById('prev-page');
-    const btnNext = document.getElementById('next-page');
+    const pageFloatingText = document.getElementById('floating-page-info');
+    const mainHeader = document.getElementById('main-header');
 
-    function renderPage(num) {
+    // Render Halaman
+    function renderPage(num, animClass = '') {
       pageRendering = true;
       loading.style.display = 'block';
 
       pdfDoc.getPage(num).then(page => {
-        const availableW = container.clientWidth - 20;
-        const availableH = container.clientHeight - 20;
+        const availableW = container.clientWidth - 8;
+        const availableH = container.clientHeight - 8;
         const unscaledViewport = page.getViewport({ scale: 1.0 });
 
         const scaleW = availableW / unscaledViewport.width;
@@ -234,12 +213,19 @@
         canvas.style.height = `${viewport.height / dpr}px`;
 
         const renderContext = { canvasContext: ctx, viewport: viewport };
-        page.render(renderContext).promise.then(() => {
+        const renderTask = page.render(renderContext);
+
+        renderTask.promise.then(() => {
           pageRendering = false;
           loading.style.display = 'none';
-          pageNumText.textContent = `Halaman: ${num} / ${pdfDoc.numPages}`;
-          btnPrev.disabled = num <= 1;
-          btnNext.disabled = num >= pdfDoc.numPages;
+
+          if (animClass) {
+            canvas.classList.remove('swipe-next', 'swipe-prev');
+            void canvas.offsetWidth; // Trigger reflow animasi
+            canvas.classList.add(animClass);
+          }
+
+          pageFloatingText.textContent = `${num} / ${pdfDoc.numPages}`;
 
           if (pageNumPending !== null) {
             renderPage(pageNumPending);
@@ -253,30 +239,67 @@
       });
     }
 
-    function queueRenderPage(num) {
+    function queueRenderPage(num, animClass = '') {
       if (pageRendering) pageNumPending = num;
-      else renderPage(num);
+      else renderPage(num, animClass);
     }
 
-    function onPrevPage() {
-      if (pageNum <= 1) return;
+    function nextPage() {
+      if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+      pageNum++;
+      queueRenderPage(pageNum, 'swipe-next');
+    }
+
+    function prevPage() {
+      if (!pdfDoc || pageNum <= 1) return;
       pageNum--;
-      queueRenderPage(pageNum);
+      queueRenderPage(pageNum, 'swipe-prev');
     }
 
-    function onNextPage() {
-      if (pageNum >= pdfDoc.numPages) return;
-      canvas.classList.add('page-turn');
-      setTimeout(() => {
-        pageNum++;
-        queueRenderPage(pageNum);
-        canvas.classList.remove('page-turn');
-      }, 120);
-    }
+    // --- LOGIKA GESTUR USAP (SWIPE) & KETUK 2X (DOUBLE TAP) ---
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let lastTapTime = 0;
 
-    btnPrev.addEventListener('click', onPrevPage);
-    btnNext.addEventListener('click', onNextPage);
+    container.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].clientX;
+      touchStartY = e.changedTouches[0].clientY;
+    }, { passive: true });
 
+    container.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const diffX = touchStartX - touchEndX;
+      const diffY = touchStartY - touchEndY;
+
+      // Cek apakah gesture adalah SWIPE (horizontal > 45px dan lebih dominan daripada gerakan vertikal)
+      if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY)) {
+        if (diffX > 0) nextPage(); // Geser ke kiri -> Halaman Selanjutnya
+        else prevPage();          // Geser ke kanan -> Halaman Sebelumnya
+        return;
+      }
+
+      // Cek apakah gesture adalah KETUK DUA KALI (DOUBLE TAP)
+      const currentTime = new Date().getTime();
+      const tapInterval = currentTime - lastTapTime;
+
+      if (tapInterval < 300 && tapInterval > 0) {
+        // Balikkan visibilitas bilah menu
+        mainHeader.classList.toggle('show');
+        lastTapTime = 0;
+      } else {
+        lastTapTime = currentTime;
+      }
+    }, { passive: true });
+
+    // Keyboard support di Laptop / Desktop
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') nextPage();
+      if (e.key === 'ArrowLeft') prevPage();
+      if (e.key === 'Escape') mainHeader.classList.toggle('show');
+    });
+
+    // Pemuatan Dokumen
     function loadPDFSource(sourceData) {
       loading.style.display = 'block';
       loading.textContent = 'Membuka dokumen...';
@@ -292,6 +315,7 @@
 
     document.getElementById('book-select').addEventListener('change', (e) => {
       loadPDFSource(e.target.value);
+      mainHeader.classList.remove('show'); // Sembunyikan kembali menu setelah dipilih
     });
 
     document.getElementById('file-input').addEventListener('change', (e) => {
@@ -300,6 +324,7 @@
       const fileReader = new FileReader();
       fileReader.onload = function() {
         loadPDFSource({ data: new Uint8Array(this.result) });
+        mainHeader.classList.remove('show');
       };
       fileReader.readAsArrayBuffer(file);
     });
@@ -308,6 +333,7 @@
       if (pdfDoc) queueRenderPage(pageNum);
     });
 
+    // Muat materi pertama saat mulai
     loadPDFSource(document.getElementById('book-select').value);
   </script>
 </body>
