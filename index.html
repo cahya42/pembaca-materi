@@ -39,7 +39,7 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      gap: 6px;
+      gap: 5px;
       z-index: 100;
       transition: transform 0.25s ease;
       transform: translateY(-100%);
@@ -64,8 +64,8 @@
       font-size: 12px;
       outline: none;
       flex: 1;
-      min-width: 80px;
-      max-width: 150px;
+      min-width: 75px;
+      max-width: 130px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -84,12 +84,15 @@
       background: #2a2a2a;
       border: 1px solid #444;
       color: #4ea8de;
-      padding: 6px 9px;
+      padding: 6px 8px;
       border-radius: 6px;
       font-weight: bold;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #file-input { display: none; }
 
@@ -201,7 +204,6 @@
       z-index: 60;
     }
 
-    /* Modal Overlay Langsung Tanpa Konflik Sentuh */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -303,28 +305,41 @@
       color: #eaeaea;
     }
     .toc-item:active { background: #2a2b36; }
+
+    #qrcode-canvas img, #qrcode-canvas canvas {
+      display: block;
+      margin: 0 auto;
+      border-radius: 4px;
+    }
   </style>
 
-  <!-- Script Penutup Modal Diletakkan di Awal (Pasti Berjalan Instan) -->
+  <!-- Pustaka Tambahan: QRCode.js, PDF.js & Supabase -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
     function closeGuideModal() {
       const modal = document.getElementById('guide-modal');
-      if (modal) {
-        modal.style.display = 'none';
-      }
+      if (modal) modal.style.display = 'none';
     }
     function openGuideModal() {
       const modal = document.getElementById('guide-modal');
-      if (modal) {
-        modal.style.display = 'flex';
-      }
+      if (modal) modal.style.display = 'flex';
+      const header = document.getElementById('main-header');
+      if (header) header.classList.remove('show');
+    }
+    function closeQrModal() {
+      const modal = document.getElementById('qr-modal');
+      if (modal) modal.style.display = 'none';
+    }
+    function openQrModal() {
+      const modal = document.getElementById('qr-modal');
+      if (modal) modal.style.display = 'flex';
       const header = document.getElementById('main-header');
       if (header) header.classList.remove('show');
     }
   </script>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -338,6 +353,7 @@
       <button id="btn-toc" class="btn-action">📑 Isi</button>
       <label for="file-input" class="btn-action">📁 File</label>
       <input type="file" id="file-input" accept="application/pdf">
+      <button id="btn-show-qr" class="btn-action" title="Bagikan QR Code" onclick="openQrModal()">📱 QR</button>
     </div>
     <button id="btn-open-guide" class="btn-help" title="Petunjuk Penggunaan" onclick="openGuideModal()">❓</button>
   </header>
@@ -353,7 +369,7 @@
     <div id="floating-page-info">- / -</div>
   </div>
 
-  <!-- MODAL PANDUAN PENGGUNAAN -->
+  <!-- MODAL 1: PANDUAN PENGGUNAAN -->
   <div id="guide-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
@@ -386,6 +402,14 @@
         </div>
 
         <div class="guide-item">
+          <span class="guide-icon">📱</span>
+          <div class="guide-text">
+            <strong>Bagikan via QR Code</strong>
+            Klik tombol <b>"📱 QR"</b> untuk memunculkan kode QR agar bisa dipindai HP lain.
+          </div>
+        </div>
+
+        <div class="guide-item">
           <span class="guide-icon">📑</span>
           <div class="guide-text">
             <strong>Daftar Isi</strong>
@@ -414,7 +438,7 @@
     </div>
   </div>
 
-  <!-- MODAL POPUP DAFTAR ISI -->
+  <!-- MODAL 2: POPUP DAFTAR ISI -->
   <div id="toc-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) this.style.display = 'none'">
     <div class="modal-box">
       <div class="modal-header">
@@ -427,7 +451,34 @@
     </div>
   </div>
 
+  <!-- MODAL 3: POPUP QR CODE -->
+  <div id="qr-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) closeQrModal()">
+    <div class="modal-box" style="align-items: center; text-align: center; padding: 22px 16px;">
+      <h3 style="color: #fff; margin-bottom: 8px; font-size: 16px;">Pindai untuk Membuka ModulKu</h3>
+      <p style="color: #aaa; font-size: 12px; margin-bottom: 16px;">Arahkan kamera HP ke kode QR di bawah ini:</p>
+      <div id="qrcode-canvas" style="background: white; padding: 12px; border-radius: 10px; display: inline-block;"></div>
+      <p style="color: #4ea8de; font-size: 11px; margin-top: 12px; word-break: break-all;">https://cahya42.github.io/pembaca-materi/</p>
+      <button class="btn-start-reading" style="margin-top: 16px; width: 80%; padding: 10px;" onclick="closeQrModal()">Tutup</button>
+    </div>
+  </div>
+
   <script>
+    // Inisialisasi QR Code Otomatis
+    window.addEventListener('load', () => {
+      try {
+        new QRCode(document.getElementById("qrcode-canvas"), {
+          text: "https://cahya42.github.io/pembaca-materi/",
+          width: 200,
+          height: 200,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch(err) {
+        console.warn("Gagal membuat QR Code:", err);
+      }
+    });
+
     const SUPABASE_URL = 'https://jgnhixgbxojcqpfxgjfk.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_mCM-3KYuxUNGkipPg-yV1A_gylLQy23';
     const BUCKET_NAME = 'materi-pdf';
@@ -662,7 +713,7 @@
     container.addEventListener('touchstart', (e) => {
       if (document.getElementById('guide-modal').style.display !== 'none' && 
           document.getElementById('guide-modal').style.display !== '') return;
-      if (tocModal.style.display === 'flex') return;
+      if (tocModal.style.display === 'flex' || document.getElementById('qr-modal').style.display === 'flex') return;
 
       hasMoved = false;
 
@@ -748,6 +799,7 @@
       if (e.key === 'ArrowLeft') prevPage();
       if (e.key === 'Escape') {
         closeGuideModal();
+        closeQrModal();
         tocModal.style.display = 'none';
         toggleMenu();
       }
